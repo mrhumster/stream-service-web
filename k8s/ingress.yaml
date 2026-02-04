@@ -1,0 +1,27 @@
+# https://kubernetes.io/docs/concepts/services-networking/ingress/
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: frontend
+  namespace: go-app
+  annotations:
+    cert-manager.io/issuer: "ca-issuer"
+spec:
+  tls:
+    - hosts:
+        - example.com
+      secretName: front-tls
+  ingressClassName: nginx
+  rules:
+    - host: example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: stream-service-web
+                port:
+                  number: 80
+---
+
