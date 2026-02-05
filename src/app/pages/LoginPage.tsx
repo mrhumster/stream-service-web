@@ -1,3 +1,6 @@
+import { useDispatch } from "react-redux";
+import { logout } from "../feature/auth/authSlice";
+import { useAuth } from "../hooks/useAuth";
 import { useGetTokenMutation } from "../services/auth";
 import { type SyntheticEvent } from "react";
 
@@ -5,12 +8,33 @@ type AuthArgs = { email: string; password: string };
 
 export const LoginPage = () => {
   const [getToken, result] = useGetTokenMutation();
+  const dispatch = useDispatch()
+
   const handleSubmit = (e: SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const payload = Object.fromEntries(formData) as AuthArgs;
     getToken(payload);
   };
+
+  const handleLogout = () => {
+    dispatch(logout())
+  }
+
+  const auth = useAuth()
+
+  if (auth.isAuth) {
+    return (
+      <div>
+        <p>You are already logged in!</p>
+        <button
+          className="mt-8 py-3 w-full cursor-pointer rounded-md bg-indigo-600 text-white transition hover:bg-indigo-700"
+          onClick={handleLogout}
+          type="button">Logout</button>
+      </div>
+    )
+  }
+
   return (
     <main className="flex items-center justify-center w-full px-4">
       <form className="flex w-full flex-col max-w-96" onSubmit={handleSubmit}>
@@ -65,8 +89,20 @@ export const LoginPage = () => {
           />
         </div>
 
+        {result.isError &&
+          <div id="password-error" className="mt-2 flex items-start text-sm text-red-600 animate-fadeIn">
+            <svg className="w-4 h-4 mr-1 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+            </svg>
+            <div>
+              <p className="font-medium">Неверный пароль</p>
+              <p className="text-red-500">Проверьте правильность ввода. Учтите регистр букв.</p>
+            </div>
+          </div>
+        }
+
         <button
-          type="submit"
+          type="submit" disabled={result.isLoading}
           className="mt-8 py-3 w-full cursor-pointer rounded-md bg-indigo-600 text-white transition hover:bg-indigo-700"
         >
           Login
@@ -78,6 +114,6 @@ export const LoginPage = () => {
           </a>
         </p>
       </form>
-    </main>
+    </main >
   );
 };
