@@ -1,0 +1,62 @@
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { type SyntheticEvent } from "react";
+import { useGetTokenMutation } from "../../services/auth";
+
+interface LoginFormProps {
+  onSuccess?: () => void;
+}
+
+type AuthArgs = { email: string; password: string };
+
+export function LoginForm({ onSuccess }: LoginFormProps) {
+  const [getToken, result] = useGetTokenMutation();
+  const handleSubmit = (e: SyntheticEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const payload = Object.fromEntries(formData) as AuthArgs;
+    getToken(payload);
+    if (onSuccess) {
+      onSuccess();
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="email" className="text-[10px] uppercase">
+          Email
+        </Label>
+        <Input
+          id="email"
+          type="email"
+          placeholder="HERO@EXAMPLE.COM"
+          className="border-4 border-black rounded-none focus-visible:ring-0 focus-visible:border-primary placeholder:opacity-30"
+        />
+      </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="password" className="text-[10px] uppercase">
+          Password
+        </Label>
+        <Input
+          id="password"
+          type="password"
+          className="border-4 border-black rounded-none focus-visible:ring-0 focus-visible:border-primary"
+        />
+      </div>
+      <Button
+        type="submit"
+        className="w-full bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-12"
+      >
+        Login
+      </Button>
+      <div className="text-center text-[8px] uppercase opacity-50">
+        New user?{" "}
+        <span className="text-primary cursor-pointer hover:underline">
+          Create account
+        </span>
+      </div>
+    </form>
+  );
+}
