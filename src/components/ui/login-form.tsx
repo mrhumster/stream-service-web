@@ -1,24 +1,44 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { type SyntheticEvent } from "react";
+import { useState, type SyntheticEvent } from "react";
+import { type FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
 import { useGetTokenMutation } from "../../services/auth";
 
 interface LoginFormProps {
   onSuccess?: () => void;
+  onRegisterClick?: () => void;
 }
 
 type AuthArgs = { email: string; password: string };
 
-export function LoginForm({ onSuccess }: LoginFormProps) {
+const inputClassName =
+  "border-4 border-black rounded-none focus-visible:ring-0 focus-visible:border-primary placeholder:opacity-30";
+
+export function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps) {
   const [getToken] = useGetTokenMutation();
-  const handleSubmit = (e: SyntheticEvent<HTMLFormElement>) => {
+  const [error, setError] = useState<string | null>(null);
+  const [fieldError, setFieldError] = useState(false);
+
+  const handleSubmit = async (e: SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setError(null);
+    setFieldError(false);
+
     const formData = new FormData(e.currentTarget);
     const payload = Object.fromEntries(formData) as AuthArgs;
-    getToken(payload);
-    if (onSuccess) {
-      onSuccess();
+
+    try {
+      await getToken(payload).unwrap();
+      onSuccess?.();
+    } catch (err) {
+      const fetchErr = err as FetchBaseQueryError;
+      if (fetchErr.status === 401) {
+        setError("Invalid email or password");
+        setFieldError(true);
+      } else {
+        setError("Login failed");
+      }
     }
   };
 
@@ -33,7 +53,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
           id="email"
           type="email"
           placeholder="HERO@EXAMPLE.COM"
-          className="border-4 border-black rounded-none focus-visible:ring-0 focus-visible:border-primary placeholder:opacity-30"
+          className={fieldError ? inputClassName + " border-destructive" : inputClassName}
         />
       </div>
       <div className="flex flex-col gap-2">
@@ -44,9 +64,14 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
           name="password"
           id="password"
           type="password"
-          className="border-4 border-black rounded-none focus-visible:ring-0 focus-visible:border-primary"
+          className={fieldError ? inputClassName + " border-destructive" : inputClassName}
         />
       </div>
+      {error && (
+        <p className="text-[10px] uppercase font-bold text-destructive">
+          {error}
+        </p>
+      )}
       <Button
         type="submit"
         className="w-full bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-12"
@@ -55,7 +80,10 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
       </Button>
       <div className="text-center text-[8px] uppercase opacity-50">
         New user?{" "}
-        <span className="text-primary cursor-pointer hover:underline">
+        <span
+          onClick={onRegisterClick}
+          className="text-primary cursor-pointer hover:underline"
+        >
           Create account
         </span>
       </div>

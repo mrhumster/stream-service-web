@@ -1,5 +1,5 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
-import type { LoginRequest, LoginResponse, Success } from "../types/auth.types";
+import type { LoginRequest, LoginResponse, RegisterRequest, Success } from "../types/auth.types";
 import type { RootState } from "../store/store";
 
 const baseQuery = fetchBaseQuery({
@@ -25,6 +25,13 @@ export const authApi = createApi({
         };
       },
     }),
+    register: builder.mutation<Success, RegisterRequest>({
+      query: (args) => ({
+        url: "auth/users",
+        method: "POST",
+        body: args,
+      }),
+    }),
     logout: builder.mutation<Success, void>({
       query: () => {
         return {
@@ -36,4 +43,4 @@ export const authApi = createApi({
   }),
 });
 
-export const { useGetTokenMutation, useLogoutMutation } = authApi;
+export const { useGetTokenMutation, useRegisterMutation, useLogoutMutation } = authApi;

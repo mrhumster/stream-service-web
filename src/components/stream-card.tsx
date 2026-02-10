@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom"
 import {
   Card,
   CardHeader,
@@ -9,7 +10,7 @@ import {
 import { cn } from "@/lib/utils"
 import type { StreamResponse, StreamStatus } from "@/types/stream.types"
 
-const statusConfig: Record<StreamStatus, { label: string; className: string }> = {
+export const statusConfig: Record<StreamStatus, { label: string; className: string }> = {
   draft: { label: "DRAFT", className: "bg-muted text-muted-foreground" },
   processing: { label: "PROCESSING", className: "bg-yellow-500 text-black" },
   ready: { label: "READY", className: "bg-blue-500 text-white" },
@@ -17,7 +18,7 @@ const statusConfig: Record<StreamStatus, { label: string; className: string }> =
   error: { label: "ERROR", className: "bg-red-600 text-white" },
 }
 
-function formatDate(dateStr: string): string {
+export function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
@@ -29,7 +30,8 @@ export function StreamCard({ stream }: { stream: StreamResponse }) {
   const status = statusConfig[stream.status]
 
   return (
-    <Card className="rounded-none border-4 border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,0.3)] gap-4 py-0 overflow-hidden">
+    <Link to={`/streams/${stream.id}`} className="block">
+    <Card className="rounded-none border-4 border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,0.3)] gap-4 py-0 overflow-hidden cursor-pointer transition-colors hover:border-primary">
       <CardHeader className="border-b-2 border-foreground/10 bg-muted/30 px-4 py-3">
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-sm uppercase tracking-tight truncate">
@@ -55,7 +57,7 @@ export function StreamCard({ stream }: { stream: StreamResponse }) {
           <span>{stream.visibility}</span>
         </div>
 
-        {stream.tags.length > 0 && (
+        {stream.tags && stream.tags.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {stream.tags.map((tag) => (
               <span
@@ -73,5 +75,6 @@ export function StreamCard({ stream }: { stream: StreamResponse }) {
         <span>{formatDate(stream.created_at)}</span>
       </CardFooter>
     </Card>
+    </Link>
   )
 }
