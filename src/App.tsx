@@ -13,11 +13,11 @@ const router = createBrowserRouter([
     children: [
       { path: "/", element: <MainPage /> },
       { path: "/streams", element: <StreamsPage /> },
+      { path: "/streams/:id", element: <StreamPage /> },
       {
         element: <ProtectedRoute />,
         children: [
           { path: "/streams/create", element: <CreateStreamPage /> },
-          { path: "/streams/:id", element: <StreamPage /> },
         ],
       },
     ],

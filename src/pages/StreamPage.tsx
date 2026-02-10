@@ -3,13 +3,33 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useGetStreamQuery } from "@/services/streams"
 import { useVideoUrl } from "@/hooks/useVideoUrl"
 import { statusConfig, formatDate } from "@/components/stream-card"
+import { useAuth } from "@/hooks/useAuth"
 import { cn } from "@/lib/utils"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Lock } from "lucide-react"
 
 export const StreamPage = () => {
   const { id } = useParams<{ id: string }>()
-  const { data: stream, isLoading, error } = useGetStreamQuery(id!)
+  const { isAuth } = useAuth()
+  const { data: stream, isLoading, error } = useGetStreamQuery(id!, { skip: !isAuth })
   const { url: videoUrl, isLoading: videoLoading, error: videoError } = useVideoUrl(id!)
+
+  if (!isAuth) {
+    return (
+      <div className="max-w-3xl mx-auto flex flex-col items-center gap-4 py-20">
+        <Lock className="size-10 text-muted-foreground" />
+        <p className="text-sm uppercase tracking-wider text-muted-foreground">
+          Sign in to view this stream
+        </p>
+        <Link
+          to="/streams"
+          className="inline-flex items-center gap-2 text-xs uppercase text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" />
+          Back to Streams
+        </Link>
+      </div>
+    )
+  }
 
   if (isLoading) {
     return (
