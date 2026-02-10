@@ -1,5 +1,5 @@
 import { ModeToggle } from "@/components/mode-toggle";
-import { Outlet } from "react-router-dom";
+import { Link, Outlet } from "react-router-dom";
 import {
   Dialog,
   DialogContent,
@@ -10,10 +10,14 @@ import {
 import { LoginForm } from "@/components/ui/login-form";
 import { useAuth } from "@/hooks/useAuth";
 import { useState } from "react";
+import { useGetAuthUserQuery } from "@/services/users";
+import { useLogoutMutation } from "@/services/auth";
 
 export const MainLayout = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { data } = useGetAuthUserQuery();
   const auth = useAuth();
+  const [logout] = useLogoutMutation();
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       <header className="border-b-4 border-primary p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.1)]">
@@ -29,9 +33,25 @@ export const MainLayout = () => {
 
           {/* Навигация и Смена темы */}
           <nav className="flex items-center gap-6">
-            <ul className="hidden md:flex gap-4 text-xs">
+            <ul className="hidden md:flex gap-4 text-xs items-center">
+              <li>
+                <Link
+                  to="/streams"
+                  className="uppercase font-bold hover:text-primary transition-colors"
+                >
+                  Streams
+                </Link>
+              </li>
               {auth.isAuth ? (
-                "USERNAME"
+                <li className="flex items-center gap-3">
+                  <span className="uppercase">{data && data.email}</span>
+                  <button
+                    onClick={() => logout()}
+                    className="bg-destructive text-destructive-foreground px-4 py-1 text-[10px] uppercase font-bold shadow-[4px_4px_0_0_rgba(0,0,0,0.2)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]"
+                  >
+                    Logout
+                  </button>
+                </li>
               ) : (
                 <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
                   <DialogTrigger asChild>

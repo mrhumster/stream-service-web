@@ -6,9 +6,9 @@ import {
   type FetchBaseQueryError,
 } from "@reduxjs/toolkit/query/react";
 import { type RootState } from "../store/store.ts";
-import { logout, tokenReceived } from "../feature/auth/authSlice";
+import { eraseAuth, tokenReceived } from "../feature/auth/authSlice";
 import type { LoginResponse } from "../types/auth.types.ts";
-import type { UsersListReponse } from "../types/user.types.ts";
+import type { UserResponse, UsersListReponse } from "../types/user.types.ts";
 
 const baseQuery = fetchBaseQuery({
   baseUrl: "https://api.example.com/",
@@ -36,7 +36,7 @@ const baseQueryWithReauth: BaseQueryFn<
     if (refreshResult.data) {
       api.dispatch(tokenReceived(refreshResult.data as LoginResponse));
       result = await baseQuery(args, api, extraOptions);
-    } else api.dispatch(logout());
+    } else api.dispatch(eraseAuth());
   }
 
   return result;
@@ -49,7 +49,10 @@ export const userApi = createApi({
     getUsers: builder.query<UsersListReponse, void>({
       query: () => "auth/users",
     }),
+    getAuthUser: builder.query<UserResponse, void>({
+      query: () => "auth/who",
+    }),
   }),
 });
 
-export const { useGetUsersQuery } = userApi;
+export const { useGetUsersQuery, useGetAuthUserQuery } = userApi;

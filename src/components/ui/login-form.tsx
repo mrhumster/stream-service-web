@@ -11,7 +11,7 @@ interface LoginFormProps {
 type AuthArgs = { email: string; password: string };
 
 export function LoginForm({ onSuccess }: LoginFormProps) {
-  const [getToken, result] = useGetTokenMutation();
+  const [getToken] = useGetTokenMutation();
   const handleSubmit = (e: SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -29,6 +29,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
           Email
         </Label>
         <Input
+          name="email"
           id="email"
           type="email"
           placeholder="HERO@EXAMPLE.COM"
@@ -40,6 +41,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
           Password
         </Label>
         <Input
+          name="password"
           id="password"
           type="password"
           className="border-4 border-black rounded-none focus-visible:ring-0 focus-visible:border-primary"

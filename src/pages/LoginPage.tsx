@@ -4,7 +4,6 @@ import { useGetUsersQuery } from "../services/users.ts";
 import { type SyntheticEvent } from "react";
 
 type AuthArgs = { email: string; password: string };
-
 export const LoginPage = () => {
   const [getToken, result] = useGetTokenMutation();
   const [logout] = useLogoutMutation();
