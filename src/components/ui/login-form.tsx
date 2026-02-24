@@ -4,6 +4,8 @@ import { Label } from "@/components/ui/label";
 import { useState, type SyntheticEvent } from "react";
 import { type FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
 import { useGetTokenMutation } from "../../services/auth";
+import { userApi } from "../../services/users";
+import { useAppDispatch } from "../../hooks";
 
 interface LoginFormProps {
   onSuccess?: () => void;
@@ -16,6 +18,7 @@ const inputClassName =
   "border-4 border-black rounded-none focus-visible:ring-0 focus-visible:border-primary placeholder:opacity-30";
 
 export function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps) {
+  const dispatch = useAppDispatch();
   const [getToken] = useGetTokenMutation();
   const [error, setError] = useState<string | null>(null);
   const [fieldError, setFieldError] = useState(false);
@@ -30,6 +33,7 @@ export function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps) {
 
     try {
       await getToken(payload).unwrap();
+      dispatch(userApi.endpoints.getAuthUser.initiate());
       onSuccess?.();
     } catch (err) {
       const fetchErr = err as FetchBaseQueryError;

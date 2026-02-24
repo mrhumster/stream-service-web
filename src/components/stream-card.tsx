@@ -26,8 +26,10 @@ export function formatDate(dateStr: string): string {
   })
 }
 
+export const defaultStatus = { label: "UNKNOWN", className: "bg-muted text-muted-foreground" }
+
 export function StreamCard({ stream }: { stream: StreamResponse }) {
-  const status = statusConfig[stream.status]
+  const status = statusConfig[stream.status] ?? defaultStatus
 
   return (
     <Link to={`/streams/${stream.id}`} className="block">

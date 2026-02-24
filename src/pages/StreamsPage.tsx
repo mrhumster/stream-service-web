@@ -1,11 +1,44 @@
+import { useState, useRef, useEffect, useCallback } from "react"
 import { Link } from "react-router-dom"
 import { StreamCard } from "@/components/stream-card"
-import { mockStreams } from "@/data/streams"
 import { useAuth } from "@/hooks/useAuth"
-import { Plus } from "lucide-react"
+import { useListStreamsPublicQuery } from "@/services/streams"
+import { Plus, Loader2 } from "lucide-react"
+
+const PAGE_SIZE = 9
 
 export const StreamsPage = () => {
   const { isAuth } = useAuth()
+  const [offset, setOffset] = useState(0)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+
+  const { data, isLoading, isFetching, error } = useListStreamsPublicQuery({
+    limit: PAGE_SIZE,
+    offset,
+  })
+
+  const hasMore = data ? data.items.length < data.total : true
+
+  const loadMore = useCallback(() => {
+    if (!isFetching && hasMore && data) {
+      setOffset(data.items.length)
+    }
+  }, [isFetching, hasMore, data])
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) loadMore()
+      },
+      { threshold: 0.1 },
+    )
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [loadMore])
 
   return (
     <div>
@@ -23,11 +56,41 @@ export const StreamsPage = () => {
           </Link>
         )}
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {mockStreams.map((stream) => (
-          <StreamCard key={stream.id} stream={stream} />
-        ))}
-      </div>
+
+      {isLoading && (
+        <div className="flex justify-center py-12">
+          <Loader2 className="size-8 animate-spin text-muted-foreground" />
+        </div>
+      )}
+
+      {error && (
+        <p className="text-center text-destructive text-sm uppercase font-bold py-12">
+          Failed to load streams
+        </p>
+      )}
+
+      {data && data.items.length === 0 && (
+        <p className="text-center text-muted-foreground text-sm uppercase font-bold py-12">
+          No streams yet
+        </p>
+      )}
+
+      {data && data.items.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {data.items.map((stream) => (
+            <StreamCard key={stream.id} stream={stream} />
+          ))}
+        </div>
+      )}
+
+      {/* Sentinel for IntersectionObserver */}
+      <div ref={sentinelRef} className="h-1" />
+
+      {isFetching && !isLoading && (
+        <div className="flex justify-center py-6">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      )}
     </div>
   )
 }

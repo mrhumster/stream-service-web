@@ -1,24 +1,40 @@
-import { Link, useParams } from "react-router-dom"
+import { Link, useParams, useNavigate } from "react-router-dom"
+import type { FetchBaseQueryError } from "@reduxjs/toolkit/query/react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { useGetStreamQuery } from "@/services/streams"
+import { useGetStreamQuery, useDeleteStreamMutation } from "@/services/streams"
 import { useVideoUrl } from "@/hooks/useVideoUrl"
-import { statusConfig, formatDate } from "@/components/stream-card"
-import { useAuth } from "@/hooks/useAuth"
+import { statusConfig, defaultStatus, formatDate } from "@/components/stream-card"
+import { useAppSelector } from "@/hooks"
 import { cn } from "@/lib/utils"
-import { ArrowLeft, Lock } from "lucide-react"
+import { ArrowLeft, Lock, Pencil, Trash2 } from "lucide-react"
 
 export const StreamPage = () => {
   const { id } = useParams<{ id: string }>()
-  const { isAuth } = useAuth()
-  const { data: stream, isLoading, error } = useGetStreamQuery(id!, { skip: !isAuth })
+  const navigate = useNavigate()
+  const authUser = useAppSelector((state) => state.auth.authUser)
+  const { data: stream, isLoading, error } = useGetStreamQuery(id!)
   const { url: videoUrl, isLoading: videoLoading, error: videoError } = useVideoUrl(id!)
+  const [deleteStream, { isLoading: isDeleting }] = useDeleteStreamMutation()
 
-  if (!isAuth) {
+  const isAccessDenied =
+    error && "status" in error && ((error as FetchBaseQueryError).status === 403)
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <span className="text-sm uppercase tracking-wider text-muted-foreground animate-pulse">
+          Loading...
+        </span>
+      </div>
+    )
+  }
+
+  if (isAccessDenied) {
     return (
       <div className="max-w-3xl mx-auto flex flex-col items-center gap-4 py-20">
         <Lock className="size-10 text-muted-foreground" />
         <p className="text-sm uppercase tracking-wider text-muted-foreground">
-          Sign in to view this stream
+          Access denied. Please contact with author
         </p>
         <Link
           to="/streams"
@@ -27,16 +43,6 @@ export const StreamPage = () => {
           <ArrowLeft className="size-4" />
           Back to Streams
         </Link>
-      </div>
-    )
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <span className="text-sm uppercase tracking-wider text-muted-foreground animate-pulse">
-          Loading...
-        </span>
       </div>
     )
   }
@@ -58,7 +64,8 @@ export const StreamPage = () => {
     )
   }
 
-  const status = statusConfig[stream.status]
+  const status = statusConfig[stream.status] ?? defaultStatus
+  const isOwner = authUser?.id === stream.owner_id
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -94,6 +101,29 @@ export const StreamPage = () => {
           ) : null}
         </div>
       </Card>
+
+      {isOwner && (
+        <div className="flex gap-2 mb-6">
+          <Link
+            to={`/streams/${stream.id}/edit`}
+            className="inline-flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold"
+          >
+            <Pencil className="size-3" />
+            Update Stream
+          </Link>
+          <button
+            disabled={isDeleting}
+            onClick={async () => {
+              await deleteStream(stream.id).unwrap()
+              navigate("/streams")
+            }}
+            className="inline-flex items-center gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold disabled:opacity-50"
+          >
+            <Trash2 className="size-3" />
+            {isDeleting ? "Deleting..." : "Delete Stream"}
+          </button>
+        </div>
+      )}
 
       {/* Metadata */}
       <Card className="rounded-none border-4 border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,0.3)]">

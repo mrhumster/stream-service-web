@@ -3,6 +3,7 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { MainPage } from "./pages/MainPage";
 import { StreamsPage } from "./pages/StreamsPage";
 import { CreateStreamPage } from "./pages/CreateStreamPage";
+import { EditStreamPage } from "./pages/EditStreamPage";
 import { StreamPage } from "./pages/StreamPage";
 import { ProtectedRoute } from "./components/protected-route";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -18,6 +19,7 @@ const router = createBrowserRouter([
         element: <ProtectedRoute />,
         children: [
           { path: "/streams/create", element: <CreateStreamPage /> },
+          { path: "/streams/:id/edit", element: <EditStreamPage /> },
         ],
       },
     ],
