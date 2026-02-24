@@ -8,7 +8,13 @@ import {
 import { type RootState } from "../store/store";
 import { eraseAuth, tokenReceived } from "../feature/auth/authSlice";
 import type { LoginResponse } from "../types/auth.types";
-import type { CreateStreamRequest, UpdateStreamRequest, StreamListParams, StreamListResponse, StreamResponse } from "../types/stream.types";
+import type {
+  CreateStreamRequest,
+  UpdateStreamRequest,
+  StreamListParams,
+  StreamListResponse,
+  StreamResponse,
+} from "../types/stream.types";
 
 const baseQuery = fetchBaseQuery({
   baseUrl: "https://api.example.com/",
@@ -45,7 +51,7 @@ const baseQueryWithReauth: BaseQueryFn<
 export const streamApi = createApi({
   reducerPath: "streamApi",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["StreamList"],
+  tagTypes: ["Stream"],
   endpoints: (builder) => ({
     listStreamsPublic: builder.query<StreamListResponse, StreamListParams>({
       query: (params) => {
@@ -64,10 +70,21 @@ export const streamApi = createApi({
       },
       forceRefetch: ({ currentArg, previousArg }) =>
         currentArg?.offset !== previousArg?.offset,
-      providesTags: ["StreamList"],
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.items.map(({ id }: { id: string }) => ({
+                type: "Stream" as const,
+                id,
+              })),
+
+              { type: "Stream" as const, id: "LIST" },
+            ]
+          : [{ type: "Stream" as const, id: "LIST" }],
     }),
     getStream: builder.query<StreamResponse, string>({
       query: (id) => `stream/${id}`,
+      providesTags: (_result, _error, id) => [{ type: "Stream" as const, id }],
     }),
     createStream: builder.mutation<StreamResponse, CreateStreamRequest>({
       query: (body) => ({
@@ -75,7 +92,7 @@ export const streamApi = createApi({
         method: "POST",
         body,
       }),
-      invalidatesTags: ["StreamList"],
+      invalidatesTags: [{ type: "Stream", id: "LIST" }],
     }),
     uploadVideo: builder.mutation<void, { id: string; file: File }>({
       query: ({ id, file }) => {
@@ -87,23 +104,40 @@ export const streamApi = createApi({
           body: formData,
         };
       },
+      invalidatesTags: (_res, _err, { id }) => [{ type: "Stream", id }],
     }),
-    updateStream: builder.mutation<StreamResponse, { id: string; body: UpdateStreamRequest }>({
+    updateStream: builder.mutation<
+      StreamResponse,
+      { id: string; body: UpdateStreamRequest }
+    >({
       query: ({ id, body }) => ({
         url: `stream/${id}`,
         method: "PATCH",
         body,
       }),
-      invalidatesTags: ["StreamList"],
+      invalidatesTags: (_res, _err, { id }) => [
+        { type: "Stream" as const, id },
+        { type: "Stream" as const, id: "LIST" },
+      ],
     }),
     deleteStream: builder.mutation<void, string>({
       query: (id) => ({
         url: `stream/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: ["StreamList"],
+      invalidatesTags: (_res, _err, id) => [
+        { type: "Stream" as const, id },
+        { type: "Stream" as const, id: "LIST" },
+      ],
     }),
   }),
 });
 
-export const { useListStreamsPublicQuery, useGetStreamQuery, useCreateStreamMutation, useUpdateStreamMutation, useUploadVideoMutation, useDeleteStreamMutation } = streamApi;
+export const {
+  useListStreamsPublicQuery,
+  useGetStreamQuery,
+  useCreateStreamMutation,
+  useUpdateStreamMutation,
+  useUploadVideoMutation,
+  useDeleteStreamMutation,
+} = streamApi;
