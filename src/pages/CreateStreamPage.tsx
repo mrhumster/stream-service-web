@@ -1,69 +1,83 @@
-import { useState, type KeyboardEvent } from "react"
-import { useNavigate } from "react-router-dom"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Button } from "@/components/ui/button"
-import { VideoDropzone } from "@/components/video-dropzone"
-import { useCreateStreamMutation, useUploadVideoMutation } from "@/services/streams"
-import { cn } from "@/lib/utils"
-import { X } from "lucide-react"
-import type { StreamVisibility } from "@/types/stream.types"
+import { useState, type KeyboardEvent } from "react";
+import { useNavigate } from "react-router-dom";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { VideoDropzone } from "@/components/video-dropzone";
+import {
+  useCreateStreamMutation,
+  useUploadVideoMutation,
+} from "@/services/streams";
+import { cn } from "@/lib/utils";
+import { X } from "lucide-react";
+import type { StreamVisibility } from "@/types/stream.types";
+import { useMultipartUpload } from "@/hooks/useMultipartUpload";
 
 const inputClassName =
-  "border-4 border-black rounded-none focus-visible:ring-0 focus-visible:border-primary"
+  "border-4 border-black rounded-none focus-visible:ring-0 focus-visible:border-primary";
 
 export const CreateStreamPage = () => {
-  const navigate = useNavigate()
-  const [createStream, { isLoading: isCreating }] = useCreateStreamMutation()
-  const [uploadVideo, { isLoading: isUploading }] = useUploadVideoMutation()
-  const isLoading = isCreating || isUploading
+  const navigate = useNavigate();
+  const [createStream, { isLoading: isCreating }] = useCreateStreamMutation();
+  const [uploadVideo, { isLoading: isUploading }] = useUploadVideoMutation();
+  const isLoading = isCreating || isUploading;
 
-  const [createdStreamId, setCreatedStreamId] = useState<string | null>(null)
-  const [uploadError, setUploadError] = useState<string | null>(null)
-  const [file, setFile] = useState<File | null>(null)
-  const [title, setTitle] = useState("")
-  const [description, setDescription] = useState("")
-  const [tags, setTags] = useState<string[]>([])
-  const [tagInput, setTagInput] = useState("")
-  const [visibility, setVisibility] = useState<StreamVisibility>("public")
+  const [createdStreamId, setCreatedStreamId] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
+  const [visibility, setVisibility] = useState<StreamVisibility>("public");
+  const { processUpload, isUploading: isMultipartUploading } =
+    useMultipartUpload();
 
   const handleTagKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
-      e.preventDefault()
-      const value = tagInput.trim().toLowerCase()
+      e.preventDefault();
+      const value = tagInput.trim().toLowerCase();
       if (value && !tags.includes(value)) {
-        setTags([...tags, value])
+        setTags([...tags, value]);
       }
-      setTagInput("")
+      setTagInput("");
     }
-  }
+  };
 
   const removeTag = (tag: string) => {
-    setTags(tags.filter((t) => t !== tag))
-  }
+    setTags(tags.filter((t) => t !== tag));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setUploadError(null)
+    e.preventDefault();
+    setUploadError(null);
     try {
-      let streamId = createdStreamId
+      let streamId = createdStreamId;
       if (!streamId) {
-        const stream = await createStream({ title, description, tags, visibility }).unwrap()
-        streamId = stream.id
-        setCreatedStreamId(streamId)
+        const stream = await createStream({
+          title,
+          description,
+          tags,
+          visibility,
+        }).unwrap();
+        streamId = stream.id;
+        setCreatedStreamId(streamId);
       }
       if (file) {
-        await uploadVideo({ id: streamId, file }).unwrap()
+        //await uploadVideo({ id: streamId, file }).unwrap();
+        await processUpload(streamId, file);
       }
-      navigate(`/streams/${streamId}`)
+      navigate(`/streams/${streamId}`);
     } catch (err) {
       if (createdStreamId) {
-        setUploadError("Video upload failed. Click the button to retry upload.")
+        setUploadError(
+          "Video upload failed. Click the button to retry upload.",
+        );
       }
-      console.error("Failed to create stream:", err)
+      console.error("Failed to create stream:", err);
     }
-  }
+  };
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -82,12 +96,15 @@ export const CreateStreamPage = () => {
             {/* Video */}
             <div className="flex flex-col gap-2">
               <Label className="text-[10px] uppercase">Video</Label>
-              <VideoDropzone file={file} onFileSelect={(f) => {
-                setFile(f)
-                if (f && !title) {
-                  setTitle(f.name.replace(/\.[^.]+$/, ""))
-                }
-              }} />
+              <VideoDropzone
+                file={file}
+                onFileSelect={(f) => {
+                  setFile(f);
+                  if (f && !title) {
+                    setTitle(f.name.replace(/\.[^.]+$/, ""));
+                  }
+                }}
+              />
             </div>
 
             {/* Title */}
@@ -198,11 +215,17 @@ export const CreateStreamPage = () => {
               disabled={isLoading || !title.trim()}
               className="w-full bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-12"
             >
-              {isCreating ? "Creating..." : isUploading ? "Uploading..." : createdStreamId ? "Retry Upload" : "Create Stream"}
+              {isCreating
+                ? "Creating..."
+                : isUploading
+                  ? "Uploading..."
+                  : createdStreamId
+                    ? "Retry Upload"
+                    : "Create Stream"}
             </Button>
           </form>
         </CardContent>
       </Card>
     </div>
-  )
-}
+  );
+};

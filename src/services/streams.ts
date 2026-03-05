@@ -14,6 +14,11 @@ import type {
   StreamListParams,
   StreamListResponse,
   StreamResponse,
+  StartUploadRequest,
+  StartUploadResponse,
+  UploadPartRequest,
+  UploadPartResponse,
+  CompleteUploadRequest,
 } from "../types/stream.types";
 
 const baseQuery = fetchBaseQuery({
@@ -130,6 +135,42 @@ export const streamApi = createApi({
         { type: "Stream" as const, id: "LIST" },
       ],
     }),
+    initUpload: builder.mutation<
+      StartUploadResponse,
+      { id: string; body: StartUploadRequest }
+    >({
+      query: ({ id, body }) => ({
+        url: `stream/${id}/upload/init`,
+        method: "POST",
+        body,
+      }),
+    }),
+    partUpload: builder.mutation<
+      UploadPartResponse,
+      { id: string; body: UploadPartRequest }
+    >({
+      query: ({ id, body }) => {
+        const formData = new FormData();
+        formData.append("uploadID", body.upload_id);
+        formData.append("partNumber", body.part_number.toString());
+        formData.append("video", body.video);
+        return {
+          url: `stream/${id}/upload/part`,
+          method: "PUT",
+          body: formData,
+        };
+      },
+    }),
+    completeUpload: builder.mutation<
+      void,
+      { id: string; body: CompleteUploadRequest }
+    >({
+      query: ({ id, body }) => ({
+        url: `stream/${id}/upload/complete`,
+        method: "POST",
+        body,
+      }),
+    }),
   }),
 });
 
@@ -140,4 +181,7 @@ export const {
   useUpdateStreamMutation,
   useUploadVideoMutation,
   useDeleteStreamMutation,
+  useInitUploadMutation,
+  usePartUploadMutation,
+  useCompleteUploadMutation,
 } = streamApi;
