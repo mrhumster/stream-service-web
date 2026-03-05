@@ -21,7 +21,6 @@ export const CreateStreamPage = () => {
   const navigate = useNavigate();
   const [createStream, { isLoading: isCreating }] = useCreateStreamMutation();
   const [uploadVideo, { isLoading: isUploading }] = useUploadVideoMutation();
-  const isLoading = isCreating || isUploading;
 
   const [createdStreamId, setCreatedStreamId] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -34,6 +33,7 @@ export const CreateStreamPage = () => {
   const { processUpload, isUploading: isMultipartUploading } =
     useMultipartUpload();
 
+  const isLoading = isCreating || isUploading || isMultipartUploading;
   const handleTagKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -65,8 +65,12 @@ export const CreateStreamPage = () => {
         setCreatedStreamId(streamId);
       }
       if (file) {
-        //await uploadVideo({ id: streamId, file }).unwrap();
-        await processUpload(streamId, file);
+        const minChunkSize = 5 * 1024 * 1024;
+        if (file.size < minChunkSize) {
+          await uploadVideo({ id: streamId, file }).unwrap();
+        } else {
+          await processUpload(streamId, file);
+        }
       }
       navigate(`/streams/${streamId}`);
     } catch (err) {
@@ -217,7 +221,7 @@ export const CreateStreamPage = () => {
             >
               {isCreating
                 ? "Creating..."
-                : isUploading
+                : isUploading || isMultipartUploading
                   ? "Uploading..."
                   : createdStreamId
                     ? "Retry Upload"
