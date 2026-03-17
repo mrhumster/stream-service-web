@@ -2,11 +2,11 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: stream-service-web
+  name: web-frontend
   namespace: go-app
 spec:
   selector:
-    app: stream-service-web
+    app: web-frontend
   ports:
     - port: 80
       targetPort: 80

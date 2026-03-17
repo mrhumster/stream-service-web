@@ -20,7 +20,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: stream-service-web
+                name: web-frontend
                 port:
                   number: 80
 ---

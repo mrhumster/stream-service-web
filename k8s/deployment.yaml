@@ -2,14 +2,14 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: stream-service-web
+  name: web-frontend
   namespace: go-app
   labels:
-    app: stream-service-web
+    app: web-frontend
 spec:
   selector:
     matchLabels:
-      app: stream-service-web
+      app: web-frontend
   replicas: 2
   strategy:
     rollingUpdate:
@@ -19,17 +19,17 @@ spec:
   template:
     metadata:
       annotations:
-        kubectl.kubernetes.io/default-container: stream-service-web
+        kubectl.kubernetes.io/default-container: web-frontend
       labels:
-        app: stream-service-web
+        app: web-frontend
     spec:
       # initContainers:
       # Init containers are exactly like regular containers, except:
       # - Init containers always run to completion.
       # - Each init container must complete successfully before the next one starts.
       containers:
-        - name: stream-service-web
-          image: xomrkob/stream-web:latest
+        - name: web-frontend
+          image: xomrkob/web-frontend:latest
           imagePullPolicy:
           resources:
             requests:
@@ -58,7 +58,7 @@ spec:
             periodSeconds: 10
           ports:
             - containerPort: 80
-              name: stream-web
+              name: web-frontend
           volumeMounts:
             - name: localtime
               mountPath: /etc/localtime

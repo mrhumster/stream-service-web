@@ -1,5 +1,5 @@
 {
-  "name": "stream-service-web",
+  "name": "web-frontend",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -8,11 +8,11 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "docker:build": "docker build -t stream-web .",
-    "docker:run": "docker run -p 3000:80 stream-web",
-    "docker:push": "docker tag stream-web xomrkob/stream-web:latest && docker push xomrkob/stream-web:latest",
+    "docker:build": "docker build -t web-frontend .",
+    "docker:run": "docker run -p 3000:80 web-frontend",
+    "docker:push": "docker tag web-frontend xomrkob/web-frontend:latest && docker push xomrkob/web-frontend:latest",
     "k8s:apply": "kubectl apply -f k8s/",
-    "k8s:deploy": "pnpm run docker:build && pnpm run docker:push && kubectl rollout restart deployments/stream-service-web -n go-app"
+    "k8s:deploy": "pnpm run docker:build && pnpm run docker:push && kubectl rollout restart deployments/web-frontend -n go-app"
   },
   "dependencies": {
     "@hackernoon/pixel-icon-library": "^1.0.6",
