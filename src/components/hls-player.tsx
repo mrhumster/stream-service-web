@@ -24,10 +24,10 @@ export const HLSPlayer = ({ src }: { src: string }) => {
           }
         },
       });
-      hls.on(Hls.Events.MANIFEST_LOADED, (event, data) => {
+      hls.on(Hls.Events.MANIFEST_LOADED, (_event, data) => {
         console.log("Manifest loaded, levels found:", data.levels.length);
       });
-      hls.on(Hls.Events.ERROR, (event, data) => {
+      hls.on(Hls.Events.ERROR, (_event, data) => {
         console.error("HLS Error Detail:", data);
       });
       hls.loadSource(src);
