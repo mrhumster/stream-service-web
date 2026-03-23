@@ -1,23 +1,32 @@
-import { Link, useParams, useNavigate } from "react-router-dom"
-import type { FetchBaseQueryError } from "@reduxjs/toolkit/query/react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { useGetStreamQuery, useDeleteStreamMutation } from "@/services/streams"
-import { useVideoUrl } from "@/hooks/useVideoUrl"
-import { statusConfig, defaultStatus, formatDate } from "@/components/stream-card"
-import { useAppSelector } from "@/hooks"
-import { cn } from "@/lib/utils"
-import { ArrowLeft, Lock, Pencil, Trash2 } from "lucide-react"
+import { Link, useParams, useNavigate } from "react-router-dom";
+import type { FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useGetStreamQuery, useDeleteStreamMutation } from "@/services/streams";
+import { useVideoUrl } from "@/hooks/useVideoUrl";
+import {
+  statusConfig,
+  defaultStatus,
+  formatDate,
+} from "@/components/stream-card";
+import { useAppSelector } from "@/hooks";
+import { cn } from "@/lib/utils";
+import { ArrowLeft, Lock, Pencil, Trash2 } from "lucide-react";
+import { HLSPlayer } from "@/components/hls-player";
 
 export const StreamPage = () => {
-  const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
-  const authUser = useAppSelector((state) => state.auth.authUser)
-  const { data: stream, isLoading, error } = useGetStreamQuery(id!)
-  const { url: videoUrl, isLoading: videoLoading, error: videoError } = useVideoUrl(id!)
-  const [deleteStream, { isLoading: isDeleting }] = useDeleteStreamMutation()
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const authUser = useAppSelector((state) => state.auth.authUser);
+  const { data: stream, isLoading, error } = useGetStreamQuery(id!);
+  const {
+    url: videoUrl,
+    isLoading: videoLoading,
+    error: videoError,
+  } = useVideoUrl(id!);
+  const [deleteStream, { isLoading: isDeleting }] = useDeleteStreamMutation();
 
   const isAccessDenied =
-    error && "status" in error && ((error as FetchBaseQueryError).status === 403)
+    error && "status" in error && (error as FetchBaseQueryError).status === 403;
 
   if (isLoading) {
     return (
@@ -26,7 +35,7 @@ export const StreamPage = () => {
           Loading...
         </span>
       </div>
-    )
+    );
   }
 
   if (isAccessDenied) {
@@ -44,7 +53,7 @@ export const StreamPage = () => {
           Back to Streams
         </Link>
       </div>
-    )
+    );
   }
 
   if (error || !stream) {
@@ -61,11 +70,11 @@ export const StreamPage = () => {
           Back to Streams
         </Link>
       </div>
-    )
+    );
   }
 
-  const status = statusConfig[stream.status] ?? defaultStatus
-  const isOwner = authUser?.id === stream.owner_id
+  const status = statusConfig[stream.status] ?? defaultStatus;
+  const isOwner = authUser?.id === stream.owner_id;
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -93,11 +102,7 @@ export const StreamPage = () => {
               {videoError}
             </span>
           ) : videoUrl ? (
-            <video
-              src={videoUrl}
-              controls
-              className="w-full h-full"
-            />
+            <HLSPlayer src={videoUrl} />
           ) : null}
         </div>
       </Card>
@@ -114,8 +119,8 @@ export const StreamPage = () => {
           <button
             disabled={isDeleting}
             onClick={async () => {
-              await deleteStream(stream.id).unwrap()
-              navigate("/streams")
+              await deleteStream(stream.id).unwrap();
+              navigate("/streams");
             }}
             className="inline-flex items-center gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold disabled:opacity-50"
           >
@@ -194,5 +199,5 @@ export const StreamPage = () => {
         </CardContent>
       </Card>
     </div>
-  )
-}
+  );
+};
