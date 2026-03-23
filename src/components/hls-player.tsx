@@ -11,7 +11,15 @@ export const HLSPlayer = ({ src }: { src: string }) => {
     if (video.canPlayType("application/vnd.apple.mpegcurl")) {
       video.src = src;
     } else if (Hls.isSupported()) {
-      const hls = new Hls();
+      const hls = new Hls({
+        xhrSetup: (xhr, url) => {
+          if (!url.startsWith("http")) {
+            const baseUrl = src.substring(0, src.lastIndexOf("/") + 1);
+            const absoluteUrl = new URL(url, baseUrl).href;
+            xhr.open("GET", absoluteUrl, true);
+          }
+        },
+      });
       hls.loadSource(src);
       hls.attachMedia(video);
       return () => hls.destroy();
