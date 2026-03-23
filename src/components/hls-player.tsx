@@ -13,11 +13,12 @@ export const HLSPlayer = ({ src }: { src: string }) => {
     } else if (Hls.isSupported()) {
       const hls = new Hls({
         xhrSetup: (xhr, url) => {
-          if (!url.startsWith("http")) {
+          if (url.includes(window.location.host) || !url.startsWith("http")) {
             const baseUrl = src.substring(0, src.lastIndexOf("/") + 1);
-            const absoluteUrl = new URL(url, baseUrl).href;
-            console.log("Absolute url", absoluteUrl);
-            xhr.open("GET", absoluteUrl, true);
+            const fileName = url.split("/").pop();
+            const correctedUrl = new URL(fileName!, baseUrl).href;
+            xhr.open("GET", correctedUrl, true);
+            console.log("Corrected URL:", correctedUrl); // Проверь в консоли!
           }
         },
       });
