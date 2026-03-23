@@ -16,6 +16,7 @@ export const HLSPlayer = ({ src }: { src: string }) => {
           if (!url.startsWith("http")) {
             const baseUrl = src.substring(0, src.lastIndexOf("/") + 1);
             const absoluteUrl = new URL(url, baseUrl).href;
+            console.log("Absolute url", absoluteUrl);
             xhr.open("GET", absoluteUrl, true);
           }
         },
