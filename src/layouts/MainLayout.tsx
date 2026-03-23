@@ -29,7 +29,7 @@ export const MainLayout = () => {
           <Link to="/" className="flex items-center gap-2 group">
             <div className="w-8 h-8 bg-primary animate-pixel-blink shadow-[2px_2px_0_0_rgba(0,0,0,1)]" />
             <h1 className="text-xl font-bold tracking-tighter uppercase">
-              STREAM<span className="text-primary">App</span>
+              GO<span className="text-primary">Cast</span>
             </h1>
           </Link>
 
@@ -48,9 +48,7 @@ export const MainLayout = () => {
                 <li className="flex items-center gap-3">
                   <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
                     <DialogTrigger asChild>
-                      <button
-                        className="uppercase font-bold hover:text-primary transition-colors"
-                      >
+                      <button className="uppercase font-bold hover:text-primary transition-colors">
                         {data?.email}
                       </button>
                     </DialogTrigger>
@@ -70,11 +68,27 @@ export const MainLayout = () => {
                         <div className="flex gap-6 text-[10px] uppercase text-muted-foreground border-t-2 border-foreground/10 pt-3">
                           <div>
                             <span className="font-bold">Created:</span>{" "}
-                            {data?.created_at && new Date(data.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+                            {data?.created_at &&
+                              new Date(data.created_at).toLocaleDateString(
+                                "en-US",
+                                {
+                                  year: "numeric",
+                                  month: "short",
+                                  day: "numeric",
+                                },
+                              )}
                           </div>
                           <div>
                             <span className="font-bold">Updated:</span>{" "}
-                            {data?.updated_at && new Date(data.updated_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+                            {data?.updated_at &&
+                              new Date(data.updated_at).toLocaleDateString(
+                                "en-US",
+                                {
+                                  year: "numeric",
+                                  month: "short",
+                                  day: "numeric",
+                                },
+                              )}
                           </div>
                         </div>
                       </div>
@@ -88,10 +102,13 @@ export const MainLayout = () => {
                   </button>
                 </li>
               ) : (
-                <Dialog open={isModalOpen} onOpenChange={(open) => {
-                  setIsModalOpen(open)
-                  if (!open) setIsRegister(false)
-                }}>
+                <Dialog
+                  open={isModalOpen}
+                  onOpenChange={(open) => {
+                    setIsModalOpen(open);
+                    if (!open) setIsRegister(false);
+                  }}
+                >
                   <DialogTrigger asChild>
                     <button
                       onClick={() => setIsModalOpen(true)}
@@ -113,7 +130,7 @@ export const MainLayout = () => {
                       {isRegister ? (
                         <RegisterForm
                           onSuccess={() => {
-                            setIsRegister(false)
+                            setIsRegister(false);
                           }}
                           onLoginClick={() => setIsRegister(false)}
                         />
