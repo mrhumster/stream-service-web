@@ -40,7 +40,7 @@ export const HLSPlayer = ({ src }: { src: string }) => {
     <video
       ref={videoRef}
       controls
-      className="w-full h-full"
+      className="w-full h-full max-h-[inherit] object-contain"
       autoPlay
       playsInline
     />

@@ -92,7 +92,7 @@ export const StreamPage = () => {
 
       {/* Video Player */}
       <Card className="rounded-none border-4 border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,0.3)] mb-6 overflow-hidden">
-        <div className="bg-black aspect-video flex items-center justify-center">
+        <div className="bg-black flex items-center justify-center max-h-[70vh] w-full">
           {videoLoading ? (
             <span className="text-sm uppercase tracking-wider text-white/50 animate-pulse">
               Loading video...
