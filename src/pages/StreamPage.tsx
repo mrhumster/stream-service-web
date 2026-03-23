@@ -28,6 +28,8 @@ export const StreamPage = () => {
   const isAccessDenied =
     error && "status" in error && (error as FetchBaseQueryError).status === 403;
 
+  const isNotReady = stream && stream.status != "ready";
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -91,21 +93,37 @@ export const StreamPage = () => {
       </h2>
 
       {/* Video Player */}
-      <Card className="rounded-none border-4 border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,0.3)] mb-6 overflow-hidden">
-        <div className="bg-black flex items-center justify-center max-h-[70vh] w-full">
-          {videoLoading ? (
-            <span className="text-sm uppercase tracking-wider text-white/50 animate-pulse">
-              Loading video...
-            </span>
-          ) : videoError ? (
-            <span className="text-sm uppercase tracking-wider text-red-400">
-              {videoError}
-            </span>
-          ) : videoUrl ? (
-            <HLSPlayer src={videoUrl} />
-          ) : null}
+      {isNotReady ? (
+        <div className="max-w-3xl mx-auto flex flex-col items-center gap-4 py-20">
+          <Lock className="size-10 text-muted-foreground" />
+          <p className="text-sm uppercase tracking-wider text-muted-foreground">
+            Stream also not ready. Plase wait....
+          </p>
+          <Link
+            to="/streams"
+            className="inline-flex items-center gap-2 text-xs uppercase text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="size-4" />
+            Back to Streams
+          </Link>
         </div>
-      </Card>
+      ) : (
+        <Card className="rounded-none border-4 border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,0.3)] mb-6 overflow-hidden">
+          <div className="bg-black flex items-center justify-center max-h-[70vh] w-full">
+            {videoLoading ? (
+              <span className="text-sm uppercase tracking-wider text-white/50 animate-pulse">
+                Loading video...
+              </span>
+            ) : videoError ? (
+              <span className="text-sm uppercase tracking-wider text-red-400">
+                {videoError}
+              </span>
+            ) : videoUrl ? (
+              <HLSPlayer src={videoUrl} />
+            ) : null}
+          </div>
+        </Card>
+      )}
 
       {isOwner && (
         <div className="flex gap-2 mb-6">
