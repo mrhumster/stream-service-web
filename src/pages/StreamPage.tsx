@@ -97,7 +97,7 @@ export const StreamPage = () => {
         <div className="max-w-3xl mx-auto flex flex-col items-center gap-4 py-20">
           <Lock className="size-10 text-muted-foreground" />
           <p className="text-sm uppercase tracking-wider text-muted-foreground">
-            Stream also not ready. Plase wait....
+            The video is not ready for playback yet. Please wait.
           </p>
           <Link
             to="/streams"
