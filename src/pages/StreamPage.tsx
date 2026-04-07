@@ -1,7 +1,6 @@
 import { Link, useParams, useNavigate } from "react-router-dom";
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TranscoderProgress } from "@/components/transcoder-progress";
 import { useGetStreamQuery, useDeleteStreamMutation } from "@/services/streams";
 import { useVideoUrl } from "@/hooks/useVideoUrl";
 import {
@@ -163,7 +162,7 @@ export const StreamPage = () => {
               )}
             >
               {status.label}
-              <TranscoderProgress streamId={stream.id} />
+              {status.label === "processing" && stream.processing.progress}
             </span>
           </div>
         </CardHeader>
