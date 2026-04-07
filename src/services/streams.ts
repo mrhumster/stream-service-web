@@ -90,29 +90,6 @@ export const streamApi = createApi({
     getStream: builder.query<StreamResponse, string>({
       query: (id) => `stream/${id}`,
       providesTags: (_result, _error, id) => [{ type: "Stream" as const, id }],
-      async onCacheEntryAdded(
-        id,
-        { getState, cacheDataLoaded, cacheEntryRemoved, dispatch },
-      ) {
-        const token = (getState() as RootState).auth.token;
-        const socket = new WebSocket(
-          `wss://api.example.com/stream/ws/updates?token=${token}`,
-        );
-        try {
-          await cacheDataLoaded;
-          socket.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            if (
-              data.type === "STREAM_UPDATED" &&
-              data.payload.stream_id == id
-            ) {
-              dispatch(streamApi.util.invalidateTags([{ type: "Stream", id }]));
-            }
-          };
-        } catch {}
-        await cacheEntryRemoved;
-        socket.close();
-      },
     }),
     createStream: builder.mutation<StreamResponse, CreateStreamRequest>({
       query: (body) => ({

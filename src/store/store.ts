@@ -4,6 +4,7 @@ import { videoProgressSlice } from "../feature/videoProgress/videoProgressSlice"
 import { authApi } from "../services/auth";
 import { userApi } from "../services/users";
 import { streamApi } from "../services/streams";
+import { socketMiddleware } from "../store/middleware/socketMiddleware";
 
 const rootReducer = combineReducers({
   [authApi.reducerPath]: authApi.reducer,
@@ -19,7 +20,8 @@ export const store = configureStore({
     getDefaultMiddleware()
       .concat(authApi.middleware)
       .concat(userApi.middleware)
-      .concat(streamApi.middleware),
+      .concat(streamApi.middleware)
+      .concat(socketMiddleware),
 });
 
 export type RootState = ReturnType<typeof store.getState>;

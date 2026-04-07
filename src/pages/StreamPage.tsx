@@ -162,7 +162,7 @@ export const StreamPage = () => {
               )}
             >
               {status.label}
-              {status.label === "processing" && stream.processing.progress}
+              {stream.status === "processing" && stream.processing.progress}
             </span>
           </div>
         </CardHeader>
