@@ -12,6 +12,7 @@ import { useAppSelector } from "@/hooks";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, Lock, Pencil, Trash2 } from "lucide-react";
 import { HLSPlayer } from "@/components/hls-player";
+import ProgressBar from "@/components/ui/8bit/progress-bar";
 
 export const StreamPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -96,7 +97,7 @@ export const StreamPage = () => {
       {isNotReady ? (
         <div className="max-w-3xl mx-auto flex flex-col items-center gap-4 py-20">
           <Lock className="size-10 text-muted-foreground" />
-          <p className="text-sm uppercase tracking-wider text-muted-foreground">
+          <p className="text-sm text-center uppercase tracking-wider text-muted-foreground">
             The video is not ready for playback yet. Please wait.
           </p>
           <Link
@@ -106,6 +107,8 @@ export const StreamPage = () => {
             <ArrowLeft className="size-4" />
             Back to Streams
           </Link>
+          <ProgressBar progress={stream.processing.progress} />
+          <p className="uppercase">{stream.processing.steps}</p>
         </div>
       ) : (
         <Card className="rounded-none border-4 border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,0.3)] mb-6 overflow-hidden">
@@ -162,7 +165,6 @@ export const StreamPage = () => {
               )}
             >
               {status.label}
-              {stream.status === "processing" && stream.processing.progress}
             </span>
           </div>
         </CardHeader>
