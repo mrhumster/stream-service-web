@@ -7,9 +7,11 @@ export const useMultipartUpload = () => {
   const [uploadPart] = streamApi.usePartUploadMutation();
   const [complete] = streamApi.useCompleteUploadMutation();
   const [isUploading, setIsUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   const processUpload = async (streamID: string, file: File) => {
     setIsUploading(true);
+    setProgress(0);
     try {
       const { upload_id } = await init({
         id: streamID,
@@ -22,6 +24,7 @@ export const useMultipartUpload = () => {
 
       const CHUNK_SIZE = 5 * 1024 * 1024;
       const totalParts = Math.ceil(file.size / CHUNK_SIZE);
+      let uploadedPartsCount = 0;
       const partsMetadata: MultipartPart[] = [];
 
       const uploadChunk = async (partNumber: number) => {
@@ -32,6 +35,11 @@ export const useMultipartUpload = () => {
           id: streamID,
           body: { upload_id, part_number: partNumber, video: blob as File },
         }).unwrap();
+        uploadedPartsCount++;
+        const currentProgress = Math.round(
+          (uploadedPartsCount / totalParts) * 100,
+        );
+        setProgress(currentProgress);
 
         return { part_number: partNumber, etag: res.etag };
       };
@@ -51,10 +59,11 @@ export const useMultipartUpload = () => {
           parts: partsMetadata.sort((a, b) => a.part_number - b.part_number),
         },
       }).unwrap();
+      setProgress(100);
       return { success: true };
     } finally {
       setIsUploading(false);
     }
   };
-  return { processUpload, isUploading };
+  return { processUpload, isUploading, progress };
 };

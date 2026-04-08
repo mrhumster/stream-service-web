@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 import type { StreamVisibility } from "@/types/stream.types";
 import { useMultipartUpload } from "@/hooks/useMultipartUpload";
+import ProgressBar from "@/components/ui/8bit/progress-bar";
 
 const inputClassName =
   "border-4 border-black rounded-none focus-visible:ring-0 focus-visible:border-primary";
@@ -30,8 +31,11 @@ export const CreateStreamPage = () => {
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [visibility, setVisibility] = useState<StreamVisibility>("public");
-  const { processUpload, isUploading: isMultipartUploading } =
-    useMultipartUpload();
+  const {
+    processUpload,
+    isUploading: isMultipartUploading,
+    progress,
+  } = useMultipartUpload();
 
   const isLoading = isCreating || isUploading || isMultipartUploading;
   const handleTagKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -214,6 +218,7 @@ export const CreateStreamPage = () => {
             )}
 
             {/* Submit */}
+            {isMultipartUploading && <ProgressBar progress={progress} />}
             <Button
               type="submit"
               disabled={isLoading || !title.trim()}

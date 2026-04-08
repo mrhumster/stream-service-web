@@ -108,7 +108,7 @@ export const StreamPage = () => {
             Back to Streams
           </Link>
           <ProgressBar progress={stream.processing.progress} />
-          <p className="uppercase">{stream.processing.steps}</p>
+          <p className="uppercase text-zinc-500">{stream.processing.steps}</p>
         </div>
       ) : (
         <Card className="rounded-none border-4 border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,0.3)] mb-6 overflow-hidden">
