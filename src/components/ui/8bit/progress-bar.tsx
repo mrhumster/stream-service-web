@@ -1,4 +1,3 @@
-import * as React from "react";
 import { Progress } from "radix-ui";
 
 const ProgressBar = ({ progress }: { progress: number }) => {
