@@ -146,7 +146,7 @@ export const StreamPage = () => {
           </Link>
           {isReady && (
             <button
-              disabled={isPublish}
+              disabled={isPublish || isPublished}
               onClick={async () => {
                 await publishStream({ id: stream.id }).unwrap();
               }}
