@@ -15,7 +15,6 @@ const router = createBrowserRouter([
     children: [
       { path: "/", element: <MainPage /> },
       { path: "/streams", element: <StreamsPage /> },
-      { path: "/streams/:id", element: <StreamPage /> },
       {
         element: <ProtectedRoute />,
         children: [
@@ -24,6 +23,7 @@ const router = createBrowserRouter([
           { path: "/streams/:id/edit", element: <EditStreamPage /> },
         ],
       },
+      { path: "/streams/:id", element: <StreamPage /> },
     ],
   },
 ]);
