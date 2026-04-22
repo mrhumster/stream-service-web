@@ -29,6 +29,11 @@ export const socketMiddleware: Middleware<{}, PartialRootState> = (store) => {
               ]),
             );
           }
+          if (data.type === "STREAM_READY") {
+            store.dispatch(
+              streamApi.util.invalidateTags([{ type: "Stream", id: "LIST" }]),
+            );
+          }
         } catch (e) {
           console.error("WS parse error", e);
         }
