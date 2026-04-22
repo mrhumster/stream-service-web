@@ -7,6 +7,7 @@ import { EditStreamPage } from "./pages/EditStreamPage";
 import { StreamPage } from "./pages/StreamPage";
 import { ProtectedRoute } from "./components/protected-route";
 import { ThemeProvider } from "@/components/theme-provider";
+import { OwnStreamsPage } from "./pages/OwnStreamsPage";
 
 const router = createBrowserRouter([
   {
@@ -18,6 +19,7 @@ const router = createBrowserRouter([
       {
         element: <ProtectedRoute />,
         children: [
+          { path: "/streams/own", element: <OwnStreamsPage /> },
           { path: "/streams/create", element: <CreateStreamPage /> },
           { path: "/streams/:id/edit", element: <EditStreamPage /> },
         ],
