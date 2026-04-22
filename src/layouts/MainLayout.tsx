@@ -45,62 +45,75 @@ export const MainLayout = () => {
                 </Link>
               </li>
               {auth.isAuth ? (
-                <li className="flex items-center gap-3">
-                  <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
-                    <DialogTrigger asChild>
-                      <button className="uppercase font-bold hover:text-primary transition-colors">
-                        {data?.email}
-                      </button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px] border-4 border-primary shadow-[8px_8px_0_0_rgba(0,0,0,1)] bg-card p-0 overflow-hidden">
-                      <DialogHeader className="bg-primary p-4 border-b-4 border-black">
-                        <DialogTitle className="text-primary-foreground text-xs uppercase tracking-tighter">
-                          Profile
-                        </DialogTitle>
-                      </DialogHeader>
-                      <div className="p-6 flex flex-col gap-4">
-                        <div>
-                          <span className="text-[10px] uppercase font-bold text-muted-foreground">
-                            Email
-                          </span>
-                          <p className="text-sm mt-1">{data?.email}</p>
-                        </div>
-                        <div className="flex gap-6 text-[10px] uppercase text-muted-foreground border-t-2 border-foreground/10 pt-3">
+                <>
+                  <li className="flex items-center gap-3">
+                    <Link
+                      to="/streams/own"
+                      className="uppercase font-bold hover:text-primary transition-colors"
+                    >
+                      My Videos
+                    </Link>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <Dialog
+                      open={isProfileOpen}
+                      onOpenChange={setIsProfileOpen}
+                    >
+                      <DialogTrigger asChild>
+                        <button className="uppercase font-bold hover:text-primary transition-colors">
+                          {data?.email}
+                        </button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[425px] border-4 border-primary shadow-[8px_8px_0_0_rgba(0,0,0,1)] bg-card p-0 overflow-hidden">
+                        <DialogHeader className="bg-primary p-4 border-b-4 border-black">
+                          <DialogTitle className="text-primary-foreground text-xs uppercase tracking-tighter">
+                            Profile
+                          </DialogTitle>
+                        </DialogHeader>
+                        <div className="p-6 flex flex-col gap-4">
                           <div>
-                            <span className="font-bold">Created:</span>{" "}
-                            {data?.created_at &&
-                              new Date(data.created_at).toLocaleDateString(
-                                "en-US",
-                                {
-                                  year: "numeric",
-                                  month: "short",
-                                  day: "numeric",
-                                },
-                              )}
+                            <span className="text-[10px] uppercase font-bold text-muted-foreground">
+                              Email
+                            </span>
+                            <p className="text-sm mt-1">{data?.email}</p>
                           </div>
-                          <div>
-                            <span className="font-bold">Updated:</span>{" "}
-                            {data?.updated_at &&
-                              new Date(data.updated_at).toLocaleDateString(
-                                "en-US",
-                                {
-                                  year: "numeric",
-                                  month: "short",
-                                  day: "numeric",
-                                },
-                              )}
+                          <div className="flex gap-6 text-[10px] uppercase text-muted-foreground border-t-2 border-foreground/10 pt-3">
+                            <div>
+                              <span className="font-bold">Created:</span>{" "}
+                              {data?.created_at &&
+                                new Date(data.created_at).toLocaleDateString(
+                                  "en-US",
+                                  {
+                                    year: "numeric",
+                                    month: "short",
+                                    day: "numeric",
+                                  },
+                                )}
+                            </div>
+                            <div>
+                              <span className="font-bold">Updated:</span>{" "}
+                              {data?.updated_at &&
+                                new Date(data.updated_at).toLocaleDateString(
+                                  "en-US",
+                                  {
+                                    year: "numeric",
+                                    month: "short",
+                                    day: "numeric",
+                                  },
+                                )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                  <button
-                    onClick={() => logout()}
-                    className="bg-destructive text-destructive-foreground px-4 py-1 text-[10px] uppercase font-bold shadow-[4px_4px_0_0_rgba(0,0,0,0.2)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]"
-                  >
-                    Logout
-                  </button>
-                </li>
+                      </DialogContent>
+                    </Dialog>
+                    <button
+                      onClick={() => logout()}
+                      className="bg-destructive text-destructive-foreground px-4 py-1 text-[10px] uppercase font-bold shadow-[4px_4px_0_0_rgba(0,0,0,0.2)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]"
+                    >
+                      Logout
+                    </button>
+                  </li>
+                </>
               ) : (
                 <Dialog
                   open={isModalOpen}
