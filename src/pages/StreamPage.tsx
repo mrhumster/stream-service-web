@@ -35,7 +35,8 @@ export const StreamPage = () => {
   const isAccessDenied =
     error && "status" in error && (error as FetchBaseQueryError).status === 403;
 
-  const isNotReady = stream && stream.status != "published";
+  const isReady = stream && stream.status == "ready";
+  const isPublish = stream && stream.status == "published";
 
   if (isLoading) {
     return (
@@ -100,7 +101,7 @@ export const StreamPage = () => {
       </h2>
 
       {/* Video Player */}
-      {isNotReady ? (
+      {!isReady && !isPublish ? (
         <div className="max-w-3xl mx-auto flex flex-col items-center gap-4 py-20">
           <Lock className="size-10 text-muted-foreground" />
           <p className="text-sm text-center uppercase tracking-wider text-muted-foreground">
@@ -143,16 +144,18 @@ export const StreamPage = () => {
             <Pencil className="size-3" />
             Update Stream
           </Link>
-          <button
-            disabled={isPublished}
-            onClick={async () => {
-              await publishStream({ id: stream.id }).unwrap();
-            }}
-            className="cursor-pointer inline-flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 fotn-bold"
-          >
-            <Globe className="size-3" />
-            To Publish
-          </button>
+          {isReady && (
+            <button
+              disabled={isPublish}
+              onClick={async () => {
+                await publishStream({ id: stream.id }).unwrap();
+              }}
+              className="cursor-pointer inline-flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 fotn-bold"
+            >
+              <Globe className="size-3" />
+              To Publish
+            </button>
+          )}
           <button
             disabled={isDeleting}
             onClick={async () => {
