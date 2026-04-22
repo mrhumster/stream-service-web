@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useRef } from "react";
 import { Link } from "react-router-dom";
 import { StreamCard } from "@/components/stream-card";
 import { useAuth } from "@/hooks/useAuth";
