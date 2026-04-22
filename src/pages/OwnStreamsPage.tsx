@@ -2,43 +2,14 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { StreamCard } from "@/components/stream-card";
 import { useAuth } from "@/hooks/useAuth";
-import { useListStreamsPublicQuery } from "@/services/streams";
+import { useListOwnStreamsQuery } from "@/services/streams";
 import { Plus, Loader2 } from "lucide-react";
-
-const PAGE_SIZE = 9;
 
 export const OwnStreamsPage = () => {
   const { isAuth } = useAuth();
-  const [offset, setOffset] = useState(0);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
-  const { data, isLoading, isFetching, error } = useListStreamsPublicQuery({
-    limit: PAGE_SIZE,
-    offset,
-  });
-
-  const hasMore = data ? data.items.length < data.total : true;
-
-  const loadMore = useCallback(() => {
-    if (!isFetching && hasMore && data) {
-      setOffset(data.items.length);
-    }
-  }, [isFetching, hasMore, data]);
-
-  useEffect(() => {
-    const sentinel = sentinelRef.current;
-    if (!sentinel) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) loadMore();
-      },
-      { threshold: 0.1 },
-    );
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [loadMore]);
+  const { data, isLoading, isFetching, error } = useListOwnStreamsQuery();
 
   return (
     <div>

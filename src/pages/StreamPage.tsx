@@ -1,7 +1,11 @@
 import { Link, useParams, useNavigate } from "react-router-dom";
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useGetStreamQuery, useDeleteStreamMutation } from "@/services/streams";
+import {
+  useGetStreamQuery,
+  useDeleteStreamMutation,
+  usePublishStreamMutation,
+} from "@/services/streams";
 import { useVideoUrl } from "@/hooks/useVideoUrl";
 import {
   statusConfig,
@@ -10,7 +14,7 @@ import {
 } from "@/components/stream-card";
 import { useAppSelector } from "@/hooks";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, Lock, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Lock, Pencil, Trash2, Globe } from "lucide-react";
 import { HLSPlayer } from "@/components/hls-player";
 import ProgressBar from "@/components/ui/8bit/progress-bar";
 
@@ -25,11 +29,13 @@ export const StreamPage = () => {
     error: videoError,
   } = useVideoUrl(id!);
   const [deleteStream, { isLoading: isDeleting }] = useDeleteStreamMutation();
+  const [publishStream, { isLoading: isPublished }] =
+    usePublishStreamMutation();
 
   const isAccessDenied =
     error && "status" in error && (error as FetchBaseQueryError).status === 403;
 
-  const isNotReady = stream && stream.status != "ready";
+  const isNotReady = stream && stream.status != "published";
 
   if (isLoading) {
     return (
@@ -138,12 +144,22 @@ export const StreamPage = () => {
             Update Stream
           </Link>
           <button
+            disabled={isPublished}
+            onClick={async () => {
+              await publishStream({ id: stream.id }).unwrap();
+            }}
+            className="cursor-pointer inline-flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 fotn-bold"
+          >
+            <Globe className="size-3" />
+            To Publish
+          </button>
+          <button
             disabled={isDeleting}
             onClick={async () => {
               await deleteStream(stream.id).unwrap();
               navigate("/streams");
             }}
-            className="inline-flex items-center gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold disabled:opacity-50"
+            className="cursor-pointer inline-flex items-center gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold disabled:opacity-50"
           >
             <Trash2 className="size-3" />
             {isDeleting ? "Deleting..." : "Delete Stream"}

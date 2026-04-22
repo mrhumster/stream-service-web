@@ -58,6 +58,31 @@ export const streamApi = createApi({
   baseQuery: baseQueryWithReauth,
   tagTypes: ["Stream"],
   endpoints: (builder) => ({
+    publishStream: builder.mutation<void, { id: string }>({
+      query: ({ id }) => ({
+        url: `stream/${id}/publish`,
+        method: "POST",
+      }),
+      invalidatesTags: (_res, _err, arg) => [
+        { type: "Stream" as const, id: arg.id },
+        { type: "Stream" as const, id: "LIST" },
+      ],
+    }),
+    listOwnStreams: builder.query<StreamListResponse, void>({
+      query: () => {
+        return `stream/own`;
+      },
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.items.map(({ id }: { id: string }) => ({
+                type: "Stream" as const,
+                id,
+              })),
+              { type: "Stream" as const, id: "LIST" },
+            ]
+          : [{ type: "Stream" as const, id: "LIST" }],
+    }),
     listStreamsPublic: builder.query<StreamListResponse, StreamListParams>({
       query: (params) => {
         const searchParams = new URLSearchParams();
@@ -184,4 +209,6 @@ export const {
   useInitUploadMutation,
   usePartUploadMutation,
   useCompleteUploadMutation,
+  useListOwnStreamsQuery,
+  usePublishStreamMutation,
 } = streamApi;
