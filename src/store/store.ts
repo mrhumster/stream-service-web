@@ -5,6 +5,7 @@ import { authApi } from "../services/auth";
 import { userApi } from "../services/users";
 import { streamApi } from "../services/streams";
 import { socketMiddleware } from "../store/middleware/socketMiddleware";
+import { authListener } from "./middleware/authListener";
 
 const rootReducer = combineReducers({
   [authApi.reducerPath]: authApi.reducer,
@@ -21,7 +22,8 @@ export const store = configureStore({
       .concat(authApi.middleware)
       .concat(userApi.middleware)
       .concat(streamApi.middleware)
-      .concat(socketMiddleware),
+      .concat(socketMiddleware)
+      .concat(authListener.middleware),
 });
 
 export type RootState = ReturnType<typeof store.getState>;
