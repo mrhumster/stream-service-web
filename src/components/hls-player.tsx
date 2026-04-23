@@ -5,18 +5,28 @@ import { Lock } from "pixelarticons/react";
 
 export const HLSPlayer = ({ src }: { src: string }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const auth = useAuth();
+  const { isAuth, token, isInitializing } = useAuth();
   const [isForbidden, setIsForbidden] = useState<Boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   useEffect(() => {
+    if (isInitializing) return;
+
+    setIsForbidden(false);
+    setErrorMessage(null);
     const video = videoRef.current;
     if (!video) return;
+
+    let hls: Hls | null = null;
+    const antiCacheUrl = src.includes("?")
+      ? `${src}&t=${Date.now()}`
+      : `${src}?t=${Date.now()}`;
 
     if (video.canPlayType("application/vnd.apple.mpegcurl")) {
       video.src = src;
     } else if (Hls.isSupported()) {
-      const hls = new Hls({
+      hls = new Hls({
         enableWorker: false,
+        manifestLoadingMaxRetry: 1,
         xhrSetup: (xhr, url) => {
           console.log("HLS requesting:", url);
           if (url.includes(window.location.host) || !url.startsWith("http")) {
@@ -26,8 +36,8 @@ export const HLSPlayer = ({ src }: { src: string }) => {
             xhr.open("GET", correctedUrl, true);
             console.log("Corrected URL:", correctedUrl); // Проверь в консоли!
           }
-          if (auth.isAuth) {
-            xhr.setRequestHeader("Authorization", `Bearer ${auth.token}`);
+          if (isAuth) {
+            xhr.setRequestHeader("Authorization", `Bearer ${token}`);
           }
         },
       });
@@ -40,17 +50,30 @@ export const HLSPlayer = ({ src }: { src: string }) => {
           setIsForbidden(true);
           const responseText = JSON.parse(data.networkDetails.responseText);
           setErrorMessage(responseText.error);
-          hls.destroy();
         }
       });
-      hls.loadSource(src);
+      hls.loadSource(antiCacheUrl);
       hls.attachMedia(video);
-      return () => hls.destroy();
+      return () => {
+        if (hls) {
+          hls.destroy();
+        }
+        video.src = "";
+      };
     }
-  }, [src]);
+  }, [src, isAuth, token, isInitializing]);
+
+  if (isInitializing) {
+    return (
+      <div className="w-full aspect-video bg-zinc-950 animate-pulse rounded-xl" />
+    );
+  }
 
   return (
-    <div className="relative w-full aspect-video bg-zinc-950 overflow-hidden rounded-xl">
+    <div
+      key={`${src}-${isAuth}`}
+      className="relative w-full aspect-video bg-zinc-950 overflow-hidden rounded-xl"
+    >
       {isForbidden ? (
         <div className="flex flex-col items-center justify-center w-full h-full p-6 text-center animate-in fade-in duration-500">
           <div className="flex items-center justify-center w-16 h-16 mb-4 rounded-full bg-destructive/10 text-destructive">

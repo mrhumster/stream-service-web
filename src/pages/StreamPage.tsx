@@ -18,11 +18,13 @@ import { cn } from "@/lib/utils";
 import { ArrowLeft, Lock, PenSquare, Delete, Globe } from "pixelarticons/react";
 import { HLSPlayer } from "@/components/hls-player";
 import ProgressBar from "@/components/ui/8bit/progress-bar";
+import { useAuth } from "@/hooks/useAuth";
 
 export const StreamPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const authUser = useAppSelector((state) => state.auth.authUser);
+  const { token, isInitializing } = useAuth();
   const { data: stream, isLoading, error } = useGetStreamQuery(id!);
   const {
     url: videoUrl,
@@ -40,8 +42,10 @@ export const StreamPage = () => {
 
   const isReady = stream && stream.status == "ready";
   const isPublish = stream && stream.status == "published";
+  const isOwner = authUser && stream && authUser.id === stream.owner_id;
+  const isProfileLoading = token && !authUser;
 
-  if (isLoading) {
+  if (isLoading || isInitializing || isProfileLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <span className="text-sm uppercase tracking-wider text-muted-foreground animate-pulse">
@@ -87,7 +91,6 @@ export const StreamPage = () => {
   }
 
   const status = statusConfig[stream.status] ?? defaultStatus;
-  const isOwner = authUser?.id === stream.owner_id;
 
   return (
     <div className="max-w-3xl mx-auto">
