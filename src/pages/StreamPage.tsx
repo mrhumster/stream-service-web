@@ -5,6 +5,7 @@ import {
   useGetStreamQuery,
   useDeleteStreamMutation,
   usePublishStreamMutation,
+  useUnpublishStreamMutation,
 } from "@/services/streams";
 import { useVideoUrl } from "@/hooks/useVideoUrl";
 import {
@@ -14,7 +15,7 @@ import {
 } from "@/components/stream-card";
 import { useAppSelector } from "@/hooks";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, Lock, Pencil, Trash2, Globe } from "lucide-react";
+import { ArrowLeft, Lock, PenSquare, Delete, Globe } from "pixelarticons/react";
 import { HLSPlayer } from "@/components/hls-player";
 import ProgressBar from "@/components/ui/8bit/progress-bar";
 
@@ -31,6 +32,8 @@ export const StreamPage = () => {
   const [deleteStream, { isLoading: isDeleting }] = useDeleteStreamMutation();
   const [publishStream, { isLoading: isPublished }] =
     usePublishStreamMutation();
+  const [unpublishStream, { isLoading: isUnpublished }] =
+    useUnpublishStreamMutation();
 
   const isAccessDenied =
     error && "status" in error && (error as FetchBaseQueryError).status === 403;
@@ -141,7 +144,7 @@ export const StreamPage = () => {
             to={`/streams/${stream.id}/edit`}
             className="inline-flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold"
           >
-            <Pencil className="size-3" />
+            <PenSquare className="size-5" />
             Update Stream
           </Link>
           {isReady && (
@@ -150,10 +153,22 @@ export const StreamPage = () => {
               onClick={async () => {
                 await publishStream({ id: stream.id }).unwrap();
               }}
-              className="cursor-pointer inline-flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 fotn-bold"
+              className="cursor-pointer inline-flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 fotn-bold"
             >
-              <Globe className="size-3" />
-              To Publish
+              <Globe className="size-5" />
+              Publish
+            </button>
+          )}
+          {isPublish && (
+            <button
+              disabled={isUnpublished}
+              onClick={async () => {
+                await unpublishStream({ id: stream.id }).unwrap();
+              }}
+              className="cursor-pointer inline-flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 fotn-bold"
+            >
+              <Globe className="size-5" />
+              Unpublish
             </button>
           )}
           <button
@@ -164,7 +179,7 @@ export const StreamPage = () => {
             }}
             className="cursor-pointer inline-flex items-center gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold disabled:opacity-50"
           >
-            <Trash2 className="size-3" />
+            <Delete className="size-5" />
             {isDeleting ? "Deleting..." : "Delete Stream"}
           </button>
         </div>

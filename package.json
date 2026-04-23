@@ -23,6 +23,7 @@
     "clsx": "^2.1.1",
     "hls.js": "^1.6.15",
     "lucide-react": "^0.563.0",
+    "pixelarticons": "^2.1.0",
     "pnpm": "^10.28.2",
     "radix-ui": "^1.4.3",
     "react": "^19.2.0",

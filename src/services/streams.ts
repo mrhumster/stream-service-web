@@ -68,6 +68,16 @@ export const streamApi = createApi({
         { type: "Stream" as const, id: "LIST" },
       ],
     }),
+    unpublishStream: builder.mutation<void, { id: string }>({
+      query: ({ id }) => ({
+        url: `stream/${id}/unpublish`,
+        method: "POST",
+      }),
+      invalidatesTags: (_res, _err, arg) => [
+        { type: "Stream" as const, id: arg.id },
+        { type: "Stream" as const, id: "LIST" },
+      ],
+    }),
     listOwnStreams: builder.query<StreamListResponse, void>({
       query: () => {
         return `stream/own`;
@@ -211,4 +221,5 @@ export const {
   useCompleteUploadMutation,
   useListOwnStreamsQuery,
   usePublishStreamMutation,
+  useUnpublishStreamMutation,
 } = streamApi;

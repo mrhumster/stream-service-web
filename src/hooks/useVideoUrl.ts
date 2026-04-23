@@ -7,7 +7,7 @@ export function useVideoUrl(streamId: string) {
   return {
     url,
     token,
-    isLoading: !token,
+    isLoading: null,
     error: null,
   };
 }

@@ -1,9 +1,13 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
+import { useAuth } from "@/hooks/useAuth";
+import { Lock } from "pixelarticons/react";
 
 export const HLSPlayer = ({ src }: { src: string }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-
+  const auth = useAuth();
+  const [isForbidden, setIsForbidden] = useState<Boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -22,6 +26,9 @@ export const HLSPlayer = ({ src }: { src: string }) => {
             xhr.open("GET", correctedUrl, true);
             console.log("Corrected URL:", correctedUrl); // Проверь в консоли!
           }
+          if (auth.isAuth) {
+            xhr.setRequestHeader("Authorization", `Bearer ${auth.token}`);
+          }
         },
       });
       hls.on(Hls.Events.MANIFEST_LOADED, (_event, data) => {
@@ -29,6 +36,12 @@ export const HLSPlayer = ({ src }: { src: string }) => {
       });
       hls.on(Hls.Events.ERROR, (_event, data) => {
         console.error("HLS Error Detail:", data);
+        if (data.response && data.response.code === 403) {
+          setIsForbidden(true);
+          const responseText = JSON.parse(data.networkDetails.responseText);
+          setErrorMessage(responseText.error);
+          hls.destroy();
+        }
       });
       hls.loadSource(src);
       hls.attachMedia(video);
@@ -37,12 +50,25 @@ export const HLSPlayer = ({ src }: { src: string }) => {
   }, [src]);
 
   return (
-    <video
-      ref={videoRef}
-      controls
-      className="w-full h-full max-h-[inherit] object-contain"
-      autoPlay
-      playsInline
-    />
+    <div className="relative w-full aspect-video bg-zinc-950 overflow-hidden rounded-xl">
+      {isForbidden ? (
+        <div className="flex flex-col items-center justify-center w-full h-full p-6 text-center animate-in fade-in duration-500">
+          <div className="flex items-center justify-center w-16 h-16 mb-4 rounded-full bg-destructive/10 text-destructive">
+            <Lock className="size-5" />
+          </div>
+          <h3 className="text-lg font-semibold text-zinc-100 uppercase tracking-wider">
+            {errorMessage}
+          </h3>
+        </div>
+      ) : (
+        <video
+          ref={videoRef}
+          controls
+          className="w-full h-full max-h-[inherit] object-contain"
+          autoPlay
+          playsInline
+        />
+      )}
+    </div>
   );
 };
