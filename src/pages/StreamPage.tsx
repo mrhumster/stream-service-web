@@ -12,7 +12,7 @@ import {
   statusConfig,
   defaultStatus,
   formatDate,
-} from "@/components/stream-card";
+} from "@/lib/stream-format";
 import { useAppSelector } from "@/hooks";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, Lock, PenSquare, Delete, Globe } from "pixelarticons/react";

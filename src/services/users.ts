@@ -13,6 +13,7 @@ import type { UserResponse, UsersListReponse } from "../types/user.types.ts";
 const baseQuery = fetchBaseQuery({
   baseUrl: "https://api.example.com/",
   credentials: "include",
+  timeout: 30000,
   prepareHeaders: (headers, { getState }) => {
     const token = (getState() as RootState).auth.token;
     if (token) headers.set("authorization", `Bearer ${token}`);

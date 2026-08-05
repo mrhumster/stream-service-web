@@ -1,4 +1,5 @@
 import type { Middleware } from "@reduxjs/toolkit";
+import type { UnknownAction } from "redux";
 import { streamApi } from "../../services/streams";
 
 interface PartialRootState {
@@ -7,9 +8,9 @@ interface PartialRootState {
   };
 }
 
-export const socketMiddleware: Middleware<{}, PartialRootState> = (store) => {
+export const socketMiddleware: Middleware<object, PartialRootState> = (store) => {
   let socket: WebSocket | null = null;
-  return (next) => (action: any) => {
+  return (next) => (action: unknown) => {
     const result = next(action);
     const state = store.getState();
     const token = state.auth.token;
@@ -44,7 +45,7 @@ export const socketMiddleware: Middleware<{}, PartialRootState> = (store) => {
       };
     }
 
-    if (action.type === "auth/eraseAuth" && socket) {
+    if ((action as UnknownAction).type === "auth/eraseAuth" && socket) {
       socket.close();
       socket = null;
     }

@@ -14,6 +14,10 @@ dist-ssr
 
 # Editor directories and files
 .vscode/*
+
+# Obsidian vault (project memory, local only)
+.obsidian/
+_notes/
 !.vscode/extensions.json
 .idea
 .DS_Store

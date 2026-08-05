@@ -2,15 +2,22 @@ import { useState } from "react";
 import { streamApi } from "@/services/streams";
 import type { MultipartPart } from "@/types/stream.types";
 
+const MAX_PART_ATTEMPTS = 3;
+const RETRY_BASE_DELAY_MS = 500;
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export const useMultipartUpload = () => {
   const [init] = streamApi.useInitUploadMutation();
   const [uploadPart] = streamApi.usePartUploadMutation();
   const [complete] = streamApi.useCompleteUploadMutation();
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   const processUpload = async (streamID: string, file: File) => {
     setIsUploading(true);
+    setError(null);
     setProgress(0);
     try {
       const { upload_id } = await init({
@@ -27,22 +34,36 @@ export const useMultipartUpload = () => {
       let uploadedPartsCount = 0;
       const partsMetadata: MultipartPart[] = [];
 
-      const uploadChunk = async (partNumber: number) => {
+      const uploadChunk = async (partNumber: number): Promise<MultipartPart> => {
         const start = (partNumber - 1) * CHUNK_SIZE;
         const end = Math.min(start + CHUNK_SIZE, file.size);
         const blob = file.slice(start, end);
-        const res = await uploadPart({
-          id: streamID,
-          body: { upload_id, part_number: partNumber, video: blob as File },
-        }).unwrap();
-        uploadedPartsCount++;
-        const currentProgress = Math.round(
-          (uploadedPartsCount / totalParts) * 100,
-        );
-        setProgress(currentProgress);
 
-        return { part_number: partNumber, etag: res.etag };
+        let attempt = 1;
+        for (;;) {
+          try {
+            const res = await uploadPart({
+              id: streamID,
+              body: { upload_id, part_number: partNumber, video: blob as File },
+            }).unwrap();
+            uploadedPartsCount++;
+            const currentProgress = Math.round(
+              (uploadedPartsCount / totalParts) * 100,
+            );
+            setProgress(currentProgress);
+            return { part_number: partNumber, etag: res.etag };
+          } catch {
+            if (attempt >= MAX_PART_ATTEMPTS) {
+              throw new Error(
+                `Upload failed on part ${partNumber} after ${MAX_PART_ATTEMPTS} attempts`,
+              );
+            }
+            attempt++;
+            await delay(RETRY_BASE_DELAY_MS * (attempt - 1));
+          }
+        }
       };
+
       const concurrency = 3;
       for (let i = 1; i <= totalParts; i += concurrency) {
         const p = [];
@@ -61,9 +82,14 @@ export const useMultipartUpload = () => {
       }).unwrap();
       setProgress(100);
       return { success: true };
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Video upload failed";
+      setError(message);
+      throw err;
     } finally {
       setIsUploading(false);
     }
   };
-  return { processUpload, isUploading, progress };
+  return { processUpload, isUploading, progress, error };
 };

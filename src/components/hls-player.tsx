@@ -151,8 +151,6 @@ export const HLSPlayer = ({ src }: { src: string }) => {
   useEffect(() => {
     if (isInitializing) return;
 
-    setIsForbidden(false);
-    setErrorMessage(null);
     const video = videoRef.current;
     if (!video) return;
 
@@ -182,6 +180,8 @@ export const HLSPlayer = ({ src }: { src: string }) => {
         },
       });
       hls.on(Hls.Events.MANIFEST_LOADED, (_event, data) => {
+        setIsForbidden(false);
+        setErrorMessage(null);
         console.log("Manifest loaded, levels found:", data.levels.length);
       });
       hls.on(Hls.Events.ERROR, (_event, data) => {

@@ -78,11 +78,11 @@ export const CreateStreamPage = () => {
       }
       navigate(`/streams/${streamId}`);
     } catch (err) {
-      if (createdStreamId) {
-        setUploadError(
-          "Video upload failed. Click the button to retry upload.",
-        );
-      }
+      setUploadError(
+        createdStreamId
+          ? "Video upload failed. Click the button to retry upload."
+          : "Failed to create stream. Check backend connectivity.",
+      );
       console.error("Failed to create stream:", err);
     }
   };
