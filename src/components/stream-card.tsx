@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom"
+import { Image } from "lucide-react"
 import {
   Card,
   CardHeader,
@@ -34,6 +35,12 @@ export function StreamCard({ stream }: { stream: StreamResponse }) {
   return (
     <Link to={`/streams/${stream.id}`} className="block">
     <Card className="rounded-none border-4 border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,0.3)] gap-4 py-0 overflow-hidden cursor-pointer transition-colors hover:border-primary">
+      <div className="aspect-video flex flex-col items-center justify-center gap-2 bg-muted border-b-2 border-foreground/10">
+        <Image className="size-8 text-muted-foreground/60" />
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60">
+          No Preview
+        </span>
+      </div>
       <CardHeader className="border-b-2 border-foreground/10 bg-muted/30 px-4 py-3">
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-sm uppercase tracking-tight truncate">

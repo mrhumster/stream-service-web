@@ -126,6 +126,13 @@ body {
   --sidebar-ring: oklch(0.552 0.016 285.938);
 }
 
+:root:not(.dark) video {
+  color-scheme: light;
+}
+:root.dark video {
+  color-scheme: dark;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
