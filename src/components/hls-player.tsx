@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import { useAuth } from "@/hooks/useAuth";
 import { Lock } from "pixelarticons/react";
@@ -93,6 +93,13 @@ export const HLSPlayer = ({ src }: { src: string }) => {
     }
   };
 
+  const toggleWide = useCallback(() => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => undefined);
+    }
+    setIsWide((v) => !v);
+  }, []);
+
   const seekBy = (delta: number) => {
     const video = videoRef.current;
     if (!video) return;
@@ -142,7 +149,7 @@ export const HLSPlayer = ({ src }: { src: string }) => {
           break;
         case "w":
         case "W":
-          setIsWide((v) => !v);
+          toggleWide();
           break;
         case "ArrowUp":
           e.preventDefault();
@@ -172,7 +179,7 @@ export const HLSPlayer = ({ src }: { src: string }) => {
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [isHovered, isFocused, isWide, showHelp]);
+  }, [isHovered, isFocused, isWide, showHelp, toggleWide]);
 
   useEffect(() => {
     if (isInitializing) return;
@@ -410,7 +417,7 @@ export const HLSPlayer = ({ src }: { src: string }) => {
               />
 
               <button
-                onClick={() => setIsWide((v) => !v)}
+                onClick={toggleWide}
                 title={isWide ? "Shrink video" : "Stretch video to screen width"}
                 className="cursor-pointer text-white hover:text-zinc-300 transition-colors shrink-0"
               >
