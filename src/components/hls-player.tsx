@@ -2,12 +2,36 @@ import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import { useAuth } from "@/hooks/useAuth";
 import { Lock } from "pixelarticons/react";
+import { Maximize2, Minimize2, Fullscreen, Minimize } from "lucide-react";
 
 export const HLSPlayer = ({ src }: { src: string }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const { isAuth, token, isInitializing } = useAuth();
   const [isForbidden, setIsForbidden] = useState<Boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isWide, setIsWide] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === wrapperRef.current);
+    };
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () =>
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    try {
+      if (!document.fullscreenElement) await el.requestFullscreen();
+      else await document.exitFullscreen();
+    } catch (e) {
+      console.error("Fullscreen failed:", e);
+    }
+  };
   useEffect(() => {
     if (isInitializing) return;
 
@@ -72,7 +96,10 @@ export const HLSPlayer = ({ src }: { src: string }) => {
   return (
     <div
       key={`${src}-${isAuth}`}
-      className="relative w-full aspect-video bg-zinc-950 overflow-hidden rounded-xl"
+      ref={wrapperRef}
+      className={`relative w-full aspect-video bg-zinc-950 overflow-hidden rounded-xl ${
+        isWide ? "fixed top-0 left-0 w-screen z-50 rounded-none" : ""
+      }`}
     >
       {isForbidden ? (
         <div className="flex flex-col items-center justify-center w-full h-full p-6 text-center animate-in fade-in duration-500">
@@ -84,13 +111,39 @@ export const HLSPlayer = ({ src }: { src: string }) => {
           </h3>
         </div>
       ) : (
-        <video
-          ref={videoRef}
-          controls
-          className="w-full h-full max-h-[inherit] object-contain"
-          autoPlay
-          playsInline
-        />
+        <>
+          <video
+            ref={videoRef}
+            controls
+            className="w-full h-full max-h-[inherit] object-contain"
+            autoPlay
+            playsInline
+          />
+          <div className="absolute top-2 right-2 z-10 flex gap-2">
+            <button
+              onClick={() => setIsWide((v) => !v)}
+              title={isWide ? "Shrink video" : "Stretch video to screen width"}
+              className="cursor-pointer bg-black/60 text-white border-2 border-white/40 p-1.5 hover:border-white hover:bg-black/80 transition-colors"
+            >
+              {isWide ? (
+                <Minimize2 className="size-4" />
+              ) : (
+                <Maximize2 className="size-4" />
+              )}
+            </button>
+            <button
+              onClick={toggleFullscreen}
+              title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+              className="cursor-pointer bg-black/60 text-white border-2 border-white/40 p-1.5 hover:border-white hover:bg-black/80 transition-colors"
+            >
+              {isFullscreen ? (
+                <Minimize className="size-4" />
+              ) : (
+                <Fullscreen className="size-4" />
+              )}
+            </button>
+          </div>
+        </>
       )}
     </div>
   );
