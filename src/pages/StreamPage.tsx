@@ -229,7 +229,9 @@ export const StreamPage = () => {
             </div>
           )}
 
-          <div className="flex flex-wrap gap-6 text-[10px] uppercase text-muted-foreground border-t-2 border-foreground/10 pt-3">
+        </CardContent>
+        <CardFooter className="flex items-center justify-between gap-2 border-t-2 border-foreground/10 px-4 py-2">
+          <div className="flex flex-wrap gap-6 text-[10px] uppercase text-muted-foreground">
             <div>
               <span className="font-bold">Created:</span>{" "}
               {formatDate(stream.created_at)}
@@ -245,8 +247,6 @@ export const StreamPage = () => {
               </div>
             )}
           </div>
-        </CardContent>
-        <CardFooter className="flex items-center justify-between gap-2 border-t-2 border-foreground/10">
           <span
             className={cn(
               "shrink-0 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
