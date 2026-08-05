@@ -332,9 +332,10 @@ export const HLSPlayer = ({ src }: { src: string }) => {
           )}
           <video
             ref={videoRef}
-            className="w-full h-full max-h-[inherit] object-contain"
+            className="w-full h-full max-h-[inherit] object-contain cursor-pointer"
             autoPlay
             playsInline
+            onClick={togglePlay}
             onPlay={() => setIsPlaying(true)}
             onPause={() => setIsPlaying(false)}
             onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
