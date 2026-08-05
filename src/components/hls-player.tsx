@@ -13,8 +13,8 @@ import {
   Fullscreen,
   Minimize,
   Keyboard,
-  Plus,
-  Minus,
+  RotateCw,
+  RotateCcw,
 } from "lucide-react";
 
 function formatTime(seconds: number): string {
@@ -27,10 +27,18 @@ function formatTime(seconds: number): string {
   return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
 }
 
-function VolumeIcon({ volume, muted }: { volume: number; muted: boolean }) {
-  if (muted || volume === 0) return <VolumeX className="size-4" />;
-  if (volume < 0.5) return <Volume1 className="size-4" />;
-  return <Volume2 className="size-4" />;
+function VolumeIcon({
+  volume,
+  muted,
+  size = "size-4",
+}: {
+  volume: number;
+  muted: boolean;
+  size?: string;
+}) {
+  if (muted || volume === 0) return <VolumeX className={size} />;
+  if (volume < 0.5) return <Volume1 className={size} />;
+  return <Volume2 className={size} />;
 }
 
 export const HLSPlayer = ({ src }: { src: string }) => {
@@ -51,6 +59,10 @@ export const HLSPlayer = ({ src }: { src: string }) => {
   const [showHelp, setShowHelp] = useState(false);
   const [volFlash, setVolFlash] = useState<{
     dir: "up" | "down";
+    nonce: number;
+  } | null>(null);
+  const [seekFlash, setSeekFlash] = useState<{
+    dir: "back" | "fwd";
     nonce: number;
   } | null>(null);
 
@@ -90,6 +102,10 @@ export const HLSPlayer = ({ src }: { src: string }) => {
     );
     video.currentTime = next;
     setCurrentTime(next);
+    setSeekFlash((f) => ({
+      dir: delta > 0 ? "fwd" : "back",
+      nonce: (f?.nonce ?? 0) + 1,
+    }));
   };
 
   const changeVolume = (delta: number) => {
@@ -250,17 +266,22 @@ export const HLSPlayer = ({ src }: { src: string }) => {
               key={volFlash.nonce}
               className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none"
             >
-              <div className="animate-volume-flash bg-card text-card-foreground border-4 border-primary shadow-[8px_8px_0_0_rgba(0,0,0,1)] p-4 flex items-center justify-center">
-                <div className="relative">
-                  <VolumeIcon volume={volume} muted={isMuted} />
-                  <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground w-5 h-5 flex items-center justify-center">
-                    {volFlash.dir === "up" ? (
-                      <Plus className="size-4" />
-                    ) : (
-                      <Minus className="size-4" />
-                    )}
-                  </span>
-                </div>
+              <div className="animate-flash">
+                <VolumeIcon volume={volume} muted={isMuted} size="size-8" />
+              </div>
+            </div>
+          )}
+          {seekFlash && (
+            <div
+              key={seekFlash.nonce}
+              className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none"
+            >
+              <div className="animate-flash">
+                {seekFlash.dir === "fwd" ? (
+                  <RotateCw className="size-8" />
+                ) : (
+                  <RotateCcw className="size-8" />
+                )}
               </div>
             </div>
           )}
