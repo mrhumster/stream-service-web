@@ -1,6 +1,6 @@
 import { Link, useParams, useNavigate } from "react-router-dom";
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import {
   useGetStreamQuery,
   useDeleteStreamMutation,
@@ -19,6 +19,7 @@ import { ArrowLeft, Lock, PenSquare, Delete, Globe } from "pixelarticons/react";
 import { HLSPlayer } from "@/components/hls-player";
 import ProgressBar from "@/components/ui/8bit/progress-bar";
 import { useAuth } from "@/hooks/useAuth";
+import { MarqueeTitle } from "@/components/marquee-title";
 
 export const StreamPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -103,7 +104,7 @@ export const StreamPage = () => {
       </Link>
 
       <h2 className="text-2xl font-bold uppercase tracking-tighter mb-6">
-        {stream.title}
+        <MarqueeTitle text={stream.title} />
       </h2>
 
       {/* Video Player */}
@@ -191,19 +192,9 @@ export const StreamPage = () => {
       {/* Metadata */}
       <Card className="rounded-none border-4 border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,0.3)]">
         <CardHeader className="border-b-2 border-foreground/10 bg-muted/30">
-          <div className="flex items-center justify-between gap-2">
-            <CardTitle className="text-sm uppercase tracking-tight">
-              Stream Details
-            </CardTitle>
-            <span
-              className={cn(
-                "shrink-0 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
-                status.className,
-              )}
-            >
-              {status.label}
-            </span>
-          </div>
+          <CardTitle className="text-sm uppercase tracking-tight">
+            Stream Details
+          </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {stream.description && (
@@ -238,7 +229,7 @@ export const StreamPage = () => {
             </div>
           )}
 
-          <div className="flex gap-6 text-[10px] uppercase text-muted-foreground border-t-2 border-foreground/10 pt-3">
+          <div className="flex flex-wrap gap-6 text-[10px] uppercase text-muted-foreground border-t-2 border-foreground/10 pt-3">
             <div>
               <span className="font-bold">Created:</span>{" "}
               {formatDate(stream.created_at)}
@@ -255,6 +246,16 @@ export const StreamPage = () => {
             )}
           </div>
         </CardContent>
+        <CardFooter className="flex items-center justify-between gap-2 border-t-2 border-foreground/10">
+          <span
+            className={cn(
+              "shrink-0 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+              status.className,
+            )}
+          >
+            {status.label}
+          </span>
+        </CardFooter>
       </Card>
     </div>
   );

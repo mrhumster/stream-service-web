@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from "react"
 import { Link } from "react-router-dom"
 import { Image } from "lucide-react"
 import {
@@ -9,12 +8,7 @@ import {
   CardContent,
   CardFooter,
 } from "@/components/ui/card"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { MarqueeTitle } from "@/components/marquee-title"
 import { cn } from "@/lib/utils"
 import type { StreamResponse, StreamStatus } from "@/types/stream.types"
 
@@ -38,27 +32,6 @@ export const defaultStatus = { label: "UNKNOWN", className: "bg-muted text-muted
 
 export function StreamCard({ stream }: { stream: StreamResponse }) {
   const status = statusConfig[stream.status] ?? defaultStatus
-  const titleRef = useRef<HTMLSpanElement>(null)
-  const [overflows, setOverflows] = useState(false)
-  const [distance, setDistance] = useState(0)
-
-  useEffect(() => {
-    const el = titleRef.current
-    if (!el) return
-
-    const update = () => {
-      const scrollWidth = el.scrollWidth
-      const clientWidth = el.clientWidth
-      setOverflows(scrollWidth > clientWidth)
-      setDistance(Math.max(scrollWidth - clientWidth, 0))
-    }
-
-    update()
-
-    const observer = new ResizeObserver(update)
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [stream.title])
 
   return (
     <Link to={`/streams/${stream.id}`} className="block">
@@ -71,31 +44,7 @@ export function StreamCard({ stream }: { stream: StreamResponse }) {
       </div>
       <CardHeader className="border-b-2 border-foreground/10 bg-muted/30 px-4 py-3">
         <CardTitle className="text-sm uppercase tracking-tight min-w-0">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="block overflow-hidden">
-                  <span
-                    ref={titleRef}
-                    className={cn(
-                      "inline-block whitespace-nowrap max-w-full",
-                      overflows && "animate-marquee",
-                    )}
-                    style={
-                      overflows
-                        ? ({ "--marquee-distance": `${distance}px` } as React.CSSProperties)
-                        : undefined
-                    }
-                  >
-                    {stream.title}
-                  </span>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>
-                {stream.title}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <MarqueeTitle text={stream.title} />
         </CardTitle>
         <CardDescription className="text-xs line-clamp-2">
           {stream.description}
