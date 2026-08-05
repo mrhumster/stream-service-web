@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap");
+@import "@fontsource/press-start-2p";
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";

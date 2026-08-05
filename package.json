@@ -15,6 +15,7 @@
     "k8s:deploy": "pnpm run docker:build && pnpm run docker:push && kubectl rollout restart deployments/web-frontend -n go-app"
   },
   "dependencies": {
+    "@fontsource/press-start-2p": "^5.3.0",
     "@hackernoon/pixel-icon-library": "^1.0.6",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@radix-ui/react-progress": "^1.1.8",
