@@ -157,3 +157,16 @@ body {
 .animate-pixel-blink {
   animation: pixel-blink 0.6s steps(2) infinite;
 }
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(-1 * var(--marquee-distance, 0px)));
+  }
+}
+
+.animate-marquee {
+  animation: marquee 6s ease-in-out infinite alternate;
+}

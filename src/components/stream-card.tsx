@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react"
 import { Link } from "react-router-dom"
 import { Image } from "lucide-react"
 import {
@@ -8,6 +9,12 @@ import {
   CardContent,
   CardFooter,
 } from "@/components/ui/card"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import type { StreamResponse, StreamStatus } from "@/types/stream.types"
 
@@ -31,6 +38,27 @@ export const defaultStatus = { label: "UNKNOWN", className: "bg-muted text-muted
 
 export function StreamCard({ stream }: { stream: StreamResponse }) {
   const status = statusConfig[stream.status] ?? defaultStatus
+  const titleRef = useRef<HTMLSpanElement>(null)
+  const [overflows, setOverflows] = useState(false)
+  const [distance, setDistance] = useState(0)
+
+  useEffect(() => {
+    const el = titleRef.current
+    if (!el) return
+
+    const update = () => {
+      const scrollWidth = el.scrollWidth
+      const clientWidth = el.clientWidth
+      setOverflows(scrollWidth > clientWidth)
+      setDistance(Math.max(scrollWidth - clientWidth, 0))
+    }
+
+    update()
+
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [stream.title])
 
   return (
     <Link to={`/streams/${stream.id}`} className="block">
@@ -42,19 +70,33 @@ export function StreamCard({ stream }: { stream: StreamResponse }) {
         </span>
       </div>
       <CardHeader className="border-b-2 border-foreground/10 bg-muted/30 px-4 py-3">
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-sm uppercase tracking-tight truncate">
-            {stream.title}
-          </CardTitle>
-          <span
-            className={cn(
-              "shrink-0 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
-              status.className,
-            )}
-          >
-            {status.label}
-          </span>
-        </div>
+        <CardTitle className="text-sm uppercase tracking-tight min-w-0">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="block overflow-hidden">
+                  <span
+                    ref={titleRef}
+                    className={cn(
+                      "inline-block whitespace-nowrap max-w-full",
+                      overflows && "animate-marquee",
+                    )}
+                    style={
+                      overflows
+                        ? ({ "--marquee-distance": `${distance}px` } as React.CSSProperties)
+                        : undefined
+                    }
+                  >
+                    {stream.title}
+                  </span>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                {stream.title}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </CardTitle>
         <CardDescription className="text-xs line-clamp-2">
           {stream.description}
         </CardDescription>
@@ -80,8 +122,16 @@ export function StreamCard({ stream }: { stream: StreamResponse }) {
         )}
       </CardContent>
 
-      <CardFooter className="border-t-2 border-foreground/10 px-4 py-2 text-[10px] text-muted-foreground">
+      <CardFooter className="flex items-center justify-between border-t-2 border-foreground/10 px-4 py-2 text-[10px] text-muted-foreground">
         <span>{formatDate(stream.created_at)}</span>
+        <span
+          className={cn(
+            "shrink-0 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+            status.className,
+          )}
+        >
+          {status.label}
+        </span>
       </CardFooter>
     </Card>
     </Link>
