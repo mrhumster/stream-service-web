@@ -12,6 +12,7 @@ import {
   VolumeX,
   Fullscreen,
   Minimize,
+  Keyboard,
 } from "lucide-react";
 
 function formatTime(seconds: number): string {
@@ -34,7 +35,7 @@ export const HLSPlayer = ({ src }: { src: string }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const { isAuth, token, isInitializing } = useAuth();
-  const [isForbidden, setIsForbidden] = useState<Boolean>(false);
+  const [isForbidden, setIsForbidden] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -43,6 +44,9 @@ export const HLSPlayer = ({ src }: { src: string }) => {
   const [isMuted, setIsMuted] = useState(false);
   const [isWide, setIsWide] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   useEffect(() => {
     const onFullscreenChange = () => {
@@ -52,14 +56,6 @@ export const HLSPlayer = ({ src }: { src: string }) => {
     return () =>
       document.removeEventListener("fullscreenchange", onFullscreenChange);
   }, []);
-
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isWide) setIsWide(false);
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [isWide]);
 
   const togglePlay = () => {
     const video = videoRef.current;
@@ -78,6 +74,79 @@ export const HLSPlayer = ({ src }: { src: string }) => {
       console.error("Fullscreen failed:", e);
     }
   };
+
+  const seekBy = (delta: number) => {
+    const video = videoRef.current;
+    if (!video) return;
+    const next = Math.min(
+      Math.max(video.currentTime + delta, 0),
+      Number.isFinite(video.duration) ? video.duration : video.currentTime,
+    );
+    video.currentTime = next;
+    setCurrentTime(next);
+  };
+
+  const changeVolume = (delta: number) => {
+    const video = videoRef.current;
+    if (!video) return;
+    const next = Math.min(Math.max(video.volume + delta, 0), 1);
+    video.volume = next;
+    if (next > 0) video.muted = false;
+  };
+
+  useEffect(() => {
+    const isActive = () =>
+      isHovered || isFocused || document.fullscreenElement === wrapperRef.current;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!isActive()) return;
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) {
+        return;
+      }
+
+      switch (e.key) {
+        case " ":
+          e.preventDefault();
+          togglePlay();
+          break;
+        case "f":
+        case "F":
+          toggleFullscreen();
+          break;
+        case "w":
+        case "W":
+          setIsWide((v) => !v);
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          changeVolume(0.1);
+          break;
+        case "ArrowDown":
+          e.preventDefault();
+          changeVolume(-0.1);
+          break;
+        case "ArrowLeft":
+          e.preventDefault();
+          seekBy(-20);
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          seekBy(20);
+          break;
+        case "h":
+        case "H":
+          setShowHelp((v) => !v);
+          break;
+        case "Escape":
+          if (showHelp) setShowHelp(false);
+          else if (isWide) setIsWide(false);
+          break;
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [isHovered, isFocused, isWide, showHelp]);
 
   useEffect(() => {
     if (isInitializing) return;
@@ -144,7 +213,12 @@ export const HLSPlayer = ({ src }: { src: string }) => {
     <div
       key={`${src}-${isAuth}`}
       ref={wrapperRef}
-      className={`group w-full overflow-hidden ${
+      tabIndex={0}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onFocus={() => setIsFocused(true)}
+      onBlur={() => setIsFocused(false)}
+      className={`group outline-none w-full overflow-hidden ${
         isWide
           ? "fixed inset-0 z-50 bg-zinc-950 flex items-center justify-center"
           : "relative aspect-video bg-zinc-950 rounded-xl"
@@ -161,6 +235,51 @@ export const HLSPlayer = ({ src }: { src: string }) => {
         </div>
       ) : (
         <>
+          {showHelp && (
+            <div
+              className="absolute inset-0 z-20 flex items-center justify-center bg-black/60"
+              onClick={() => setShowHelp(false)}
+            >
+              <div
+                className="bg-card text-card-foreground border-4 border-primary shadow-[8px_8px_0_0_rgba(0,0,0,1)] p-5 max-w-xs w-full mx-4"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h4 className="text-xs font-bold uppercase tracking-wider text-primary mb-4">
+                  Keyboard Shortcuts
+                </h4>
+                <ul className="flex flex-col gap-2 text-[10px] uppercase tracking-wider">
+                  <li className="flex items-center justify-between gap-3">
+                    <span>Play / Pause</span>
+                    <kbd className="bg-muted px-1.5 py-0.5 border border-foreground/20">SPACE</kbd>
+                  </li>
+                  <li className="flex items-center justify-between gap-3">
+                    <span>Fullscreen</span>
+                    <kbd className="bg-muted px-1.5 py-0.5 border border-foreground/20">F</kbd>
+                  </li>
+                  <li className="flex items-center justify-between gap-3">
+                    <span>Wide screen</span>
+                    <kbd className="bg-muted px-1.5 py-0.5 border border-foreground/20">W</kbd>
+                  </li>
+                  <li className="flex items-center justify-between gap-3">
+                    <span>Volume</span>
+                    <kbd className="bg-muted px-1.5 py-0.5 border border-foreground/20">↑ / ↓</kbd>
+                  </li>
+                  <li className="flex items-center justify-between gap-3">
+                    <span>Seek ±20s</span>
+                    <kbd className="bg-muted px-1.5 py-0.5 border border-foreground/20">← / →</kbd>
+                  </li>
+                  <li className="flex items-center justify-between gap-3">
+                    <span>Show / hide help</span>
+                    <kbd className="bg-muted px-1.5 py-0.5 border border-foreground/20">H</kbd>
+                  </li>
+                  <li className="flex items-center justify-between gap-3">
+                    <span>Close help / exit wide</span>
+                    <kbd className="bg-muted px-1.5 py-0.5 border border-foreground/20">ESC</kbd>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          )}
           <video
             ref={videoRef}
             className="w-full h-full max-h-[inherit] object-contain"
@@ -249,6 +368,14 @@ export const HLSPlayer = ({ src }: { src: string }) => {
                 ) : (
                   <Maximize2 className="size-5" />
                 )}
+              </button>
+
+              <button
+                onClick={() => setShowHelp((v) => !v)}
+                title="Keyboard shortcuts (H)"
+                className="cursor-pointer text-white hover:text-zinc-300 transition-colors shrink-0"
+              >
+                <Keyboard className="size-5" />
               </button>
 
               <button
