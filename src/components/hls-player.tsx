@@ -53,6 +53,14 @@ export const HLSPlayer = ({ src }: { src: string }) => {
       document.removeEventListener("fullscreenchange", onFullscreenChange);
   }, []);
 
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isWide) setIsWide(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [isWide]);
+
   const togglePlay = () => {
     const video = videoRef.current;
     if (!video) return;
@@ -136,10 +144,10 @@ export const HLSPlayer = ({ src }: { src: string }) => {
     <div
       key={`${src}-${isAuth}`}
       ref={wrapperRef}
-      className={`group relative w-full overflow-hidden ${
+      className={`group w-full overflow-hidden ${
         isWide
-          ? "fixed top-0 left-0 w-screen z-50 bg-zinc-950 rounded-none h-screen flex items-center justify-center"
-          : "aspect-video bg-zinc-950 rounded-xl"
+          ? "fixed inset-0 z-50 bg-zinc-950 flex items-center justify-center"
+          : "relative aspect-video bg-zinc-950 rounded-xl"
       }`}
     >
       {isForbidden ? (
