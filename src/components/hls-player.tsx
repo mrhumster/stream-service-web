@@ -2,7 +2,33 @@ import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import { useAuth } from "@/hooks/useAuth";
 import { Lock } from "pixelarticons/react";
-import { Maximize2, Minimize2, Fullscreen, Minimize } from "lucide-react";
+import {
+  Play,
+  Pause,
+  Maximize2,
+  Minimize2,
+  Volume1,
+  Volume2,
+  VolumeX,
+  Fullscreen,
+  Minimize,
+} from "lucide-react";
+
+function formatTime(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+  const total = Math.floor(seconds);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const ss = String(s).padStart(2, "0");
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
+}
+
+function VolumeIcon({ volume, muted }: { volume: number; muted: boolean }) {
+  if (muted || volume === 0) return <VolumeX className="size-4" />;
+  if (volume < 0.5) return <Volume1 className="size-4" />;
+  return <Volume2 className="size-4" />;
+}
 
 export const HLSPlayer = ({ src }: { src: string }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -10,6 +36,11 @@ export const HLSPlayer = ({ src }: { src: string }) => {
   const { isAuth, token, isInitializing } = useAuth();
   const [isForbidden, setIsForbidden] = useState<Boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(1);
+  const [isMuted, setIsMuted] = useState(false);
   const [isWide, setIsWide] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -22,6 +53,13 @@ export const HLSPlayer = ({ src }: { src: string }) => {
       document.removeEventListener("fullscreenchange", onFullscreenChange);
   }, []);
 
+  const togglePlay = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.paused) video.play().catch(() => undefined);
+    else video.pause();
+  };
+
   const toggleFullscreen = async () => {
     const el = wrapperRef.current;
     if (!el) return;
@@ -32,6 +70,7 @@ export const HLSPlayer = ({ src }: { src: string }) => {
       console.error("Fullscreen failed:", e);
     }
   };
+
   useEffect(() => {
     if (isInitializing) return;
 
@@ -97,8 +136,10 @@ export const HLSPlayer = ({ src }: { src: string }) => {
     <div
       key={`${src}-${isAuth}`}
       ref={wrapperRef}
-      className={`relative w-full aspect-video bg-zinc-950 overflow-hidden rounded-xl ${
-        isWide ? "fixed top-0 left-0 w-screen z-50 rounded-none" : ""
+      className={`group relative w-full overflow-hidden ${
+        isWide
+          ? "fixed top-0 left-0 w-screen z-50 bg-zinc-950 rounded-none h-screen flex items-center justify-center"
+          : "aspect-video bg-zinc-950 rounded-xl"
       }`}
     >
       {isForbidden ? (
@@ -114,34 +155,106 @@ export const HLSPlayer = ({ src }: { src: string }) => {
         <>
           <video
             ref={videoRef}
-            controls
             className="w-full h-full max-h-[inherit] object-contain"
             autoPlay
             playsInline
+            onPlay={() => setIsPlaying(true)}
+            onPause={() => setIsPlaying(false)}
+            onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+            onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+            onVolumeChange={(e) => {
+              setVolume(e.currentTarget.volume);
+              setIsMuted(e.currentTarget.muted);
+            }}
           />
-          <div className="absolute top-2 right-2 z-10 flex gap-2">
-            <button
-              onClick={() => setIsWide((v) => !v)}
-              title={isWide ? "Shrink video" : "Stretch video to screen width"}
-              className="cursor-pointer bg-black/60 text-white border-2 border-white/40 p-1.5 hover:border-white hover:bg-black/80 transition-colors"
-            >
-              {isWide ? (
-                <Minimize2 className="size-4" />
-              ) : (
-                <Maximize2 className="size-4" />
-              )}
-            </button>
-            <button
-              onClick={toggleFullscreen}
-              title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-              className="cursor-pointer bg-black/60 text-white border-2 border-white/40 p-1.5 hover:border-white hover:bg-black/80 transition-colors"
-            >
-              {isFullscreen ? (
-                <Minimize className="size-4" />
-              ) : (
-                <Fullscreen className="size-4" />
-              )}
-            </button>
+
+          {/* Custom Controls */}
+          <div className="absolute bottom-0 inset-x-0 z-10 px-3 pb-2 pt-8 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <input
+              type="range"
+              min={0}
+              max={duration || 0}
+              step={0.1}
+              value={currentTime}
+              onChange={(e) => {
+                const video = videoRef.current;
+                if (video) video.currentTime = Number(e.target.value);
+                setCurrentTime(Number(e.target.value));
+              }}
+              className="w-full h-1 cursor-pointer accent-white"
+            />
+            <div className="flex items-center gap-2 mt-1.5">
+              <button
+                onClick={togglePlay}
+                title={isPlaying ? "Pause" : "Play"}
+                className="cursor-pointer text-white hover:text-zinc-300 transition-colors shrink-0"
+              >
+                {isPlaying ? (
+                  <Pause className="size-5" />
+                ) : (
+                  <Play className="size-5" />
+                )}
+              </button>
+
+              <span className="text-[10px] font-bold uppercase tracking-wider text-white/90 shrink-0 tabular-nums">
+                {formatTime(currentTime)} / {formatTime(duration)}
+              </span>
+
+              <div className="flex-1" />
+
+              <button
+                onClick={() => {
+                  const video = videoRef.current;
+                  if (!video) return;
+                  video.muted = !video.muted;
+                }}
+                title={isMuted ? "Unmute" : "Mute"}
+                className="cursor-pointer text-white hover:text-zinc-300 transition-colors shrink-0"
+              >
+                <VolumeIcon volume={volume} muted={isMuted} />
+              </button>
+
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={isMuted ? 0 : volume}
+                onChange={(e) => {
+                  const video = videoRef.current;
+                  const v = Number(e.target.value);
+                  if (video) {
+                    video.volume = v;
+                    video.muted = v === 0;
+                  }
+                }}
+                className="w-20 h-1 cursor-pointer accent-white shrink-0"
+              />
+
+              <button
+                onClick={() => setIsWide((v) => !v)}
+                title={isWide ? "Shrink video" : "Stretch video to screen width"}
+                className="cursor-pointer text-white hover:text-zinc-300 transition-colors shrink-0"
+              >
+                {isWide ? (
+                  <Minimize2 className="size-5" />
+                ) : (
+                  <Maximize2 className="size-5" />
+                )}
+              </button>
+
+              <button
+                onClick={toggleFullscreen}
+                title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                className="cursor-pointer text-white hover:text-zinc-300 transition-colors shrink-0"
+              >
+                {isFullscreen ? (
+                  <Minimize className="size-5" />
+                ) : (
+                  <Fullscreen className="size-5" />
+                )}
+              </button>
+            </div>
           </div>
         </>
       )}
