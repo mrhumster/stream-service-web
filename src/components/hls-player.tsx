@@ -13,6 +13,8 @@ import {
   Fullscreen,
   Minimize,
   Keyboard,
+  Plus,
+  Minus,
 } from "lucide-react";
 
 function formatTime(seconds: number): string {
@@ -47,6 +49,10 @@ export const HLSPlayer = ({ src }: { src: string }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [volFlash, setVolFlash] = useState<{
+    dir: "up" | "down";
+    nonce: number;
+  } | null>(null);
 
   useEffect(() => {
     const onFullscreenChange = () => {
@@ -92,6 +98,10 @@ export const HLSPlayer = ({ src }: { src: string }) => {
     const next = Math.min(Math.max(video.volume + delta, 0), 1);
     video.volume = next;
     if (next > 0) video.muted = false;
+    setVolFlash((f) => ({
+      dir: delta > 0 ? "up" : "down",
+      nonce: (f?.nonce ?? 0) + 1,
+    }));
   };
 
   useEffect(() => {
@@ -235,6 +245,25 @@ export const HLSPlayer = ({ src }: { src: string }) => {
         </div>
       ) : (
         <>
+          {volFlash && (
+            <div
+              key={volFlash.nonce}
+              className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none"
+            >
+              <div className="animate-volume-flash bg-card text-card-foreground border-4 border-primary shadow-[8px_8px_0_0_rgba(0,0,0,1)] p-4 flex items-center justify-center">
+                <div className="relative">
+                  <VolumeIcon volume={volume} muted={isMuted} />
+                  <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground w-5 h-5 flex items-center justify-center">
+                    {volFlash.dir === "up" ? (
+                      <Plus className="size-4" />
+                    ) : (
+                      <Minus className="size-4" />
+                    )}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
           {showHelp && (
             <div
               className="absolute inset-0 z-20 flex items-center justify-center bg-black/60"
