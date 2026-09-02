@@ -20,7 +20,7 @@ export function ModeToggle() {
       className="pixel-border"
     >
       <Sun
-        className={`size-5 transition-all ${
+        className={`absolute size-5 transition-all ${
           theme === "light" ? "rotate-0 scale-100" : "rotate-90 scale-0"
         }`}
       />
@@ -30,7 +30,7 @@ export function ModeToggle() {
         }`}
       />
       <Moon
-        className={`size-5 transition-all ${
+        className={`absolute size-5 transition-all ${
           theme === "dark" ? "rotate-0 scale-100" : "-rotate-90 scale-0"
         }`}
       />
