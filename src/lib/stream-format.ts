@@ -23,3 +23,14 @@ export function formatDate(dateStr: string): string {
     day: "numeric",
   });
 }
+
+const THUMBNAIL_BASE_URL =
+  "https://storage.example.com/go-app-bucket/thumbnails";
+
+export function thumbnailUrl(streamId: string): string {
+  return `${THUMBNAIL_BASE_URL}/${streamId}.jpg`;
+}
+
+export function hasThumbnail(status: StreamStatus): boolean {
+  return status !== "draft" && status !== "error";
+}

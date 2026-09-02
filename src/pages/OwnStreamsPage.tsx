@@ -14,8 +14,8 @@ export const OwnStreamsPage = () => {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold uppercase tracking-tighter">
-          Streams
+        <h2 className="text-2xl font-bold uppercase tracking-tighter select-none cursor-default">
+          My Streams
         </h2>
         {isAuth && (
           <Link

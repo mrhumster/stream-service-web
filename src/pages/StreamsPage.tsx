@@ -43,7 +43,7 @@ export const StreamsPage = () => {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold uppercase tracking-tighter">
+        <h2 className="text-2xl font-bold uppercase tracking-tighter select-none cursor-default">
           Streams
         </h2>
         {isAuth && (

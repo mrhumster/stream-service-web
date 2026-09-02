@@ -1,6 +1,16 @@
+import { useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import {
   useGetStreamQuery,
   useDeleteStreamMutation,
@@ -37,6 +47,9 @@ export const StreamPage = () => {
     usePublishStreamMutation();
   const [unpublishStream, { isLoading: isUnpublished }] =
     useUnpublishStreamMutation();
+  const [confirmAction, setConfirmAction] = useState<
+    "publish" | "unpublish" | "delete" | null
+  >(null);
 
   const isAccessDenied =
     error && "status" in error && (error as FetchBaseQueryError).status === 403;
@@ -143,49 +156,114 @@ export const StreamPage = () => {
       )}
 
       {isOwner && (
-        <div className="flex gap-2 mb-6">
+        <div className="flex items-center gap-2 mb-6">
           <Link
             to={`/streams/${stream.id}/edit`}
-            className="inline-flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold"
+            aria-label="Update Stream"
+            className="inline-flex items-center justify-center min-w-9 gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-3 sm:px-4 font-bold"
           >
             <PenSquare className="size-5" />
-            Update Stream
+            <span className="hidden md:inline">Update Stream</span>
           </Link>
           {isReady && (
             <button
               disabled={isPublish || isPublished}
-              onClick={async () => {
-                await publishStream({ id: stream.id }).unwrap();
-              }}
-              className="cursor-pointer inline-flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 fotn-bold"
+              onClick={() => setConfirmAction("publish")}
+              aria-label="Publish"
+              className="cursor-pointer inline-flex items-center justify-center min-w-9 gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-3 sm:px-4 font-bold"
             >
               <Globe className="size-5" />
-              Publish
+              <span className="hidden md:inline">Publish</span>
             </button>
           )}
           {isPublish && (
             <button
               disabled={isUnpublished}
-              onClick={async () => {
-                await unpublishStream({ id: stream.id }).unwrap();
-              }}
-              className="cursor-pointer inline-flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 fotn-bold"
+              onClick={() => setConfirmAction("unpublish")}
+              aria-label="Unpublish"
+              className="cursor-pointer inline-flex items-center justify-center min-w-9 gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-3 sm:px-4 font-bold"
             >
               <Globe className="size-5" />
-              Unpublish
+              <span className="hidden md:inline">Unpublish</span>
             </button>
           )}
           <button
             disabled={isDeleting}
-            onClick={async () => {
-              await deleteStream(stream.id).unwrap();
-              navigate("/streams");
-            }}
-            className="cursor-pointer inline-flex items-center gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold disabled:opacity-50"
+            onClick={() => setConfirmAction("delete")}
+            aria-label={isDeleting ? "Deleting..." : "Delete Stream"}
+            className="cursor-pointer inline-flex items-center justify-center min-w-9 gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-3 sm:px-4 font-bold disabled:opacity-50"
           >
             <Delete className="size-5" />
-            {isDeleting ? "Deleting..." : "Delete Stream"}
+            <span className="hidden md:inline">
+              {isDeleting ? "Deleting..." : "Delete Stream"}
+            </span>
           </button>
+
+          <Dialog
+            open={confirmAction !== null}
+            onOpenChange={(open) => !open && setConfirmAction(null)}
+          >
+            <DialogContent className="border-4 border-primary shadow-[8px_8px_0_0_rgba(0,0,0,1)] rounded-none max-w-sm">
+              <DialogHeader>
+                <DialogTitle className="text-sm uppercase tracking-wider">
+                  {confirmAction === "publish"
+                    ? "Publish stream?"
+                    : confirmAction === "unpublish"
+                      ? "Unpublish stream?"
+                      : "Delete stream?"}
+                </DialogTitle>
+                <DialogDescription className="text-xs uppercase tracking-wider">
+                  {confirmAction === "publish"
+                    ? "This will make the stream publicly available."
+                    : confirmAction === "unpublish"
+                      ? "This will make the stream private again."
+                      : "This action cannot be undone."}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setConfirmAction(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant={
+                    confirmAction === "delete" ? "destructive" : "default"
+                  }
+                  disabled={
+                    (confirmAction === "publish" && isPublished) ||
+                    (confirmAction === "unpublish" && isUnpublished) ||
+                    (confirmAction === "delete" && isDeleting)
+                  }
+                  onClick={async () => {
+                    const action = confirmAction;
+                    setConfirmAction(null);
+                    if (action === "publish") {
+                      await publishStream({ id: stream.id }).unwrap();
+                    } else if (action === "unpublish") {
+                      await unpublishStream({ id: stream.id }).unwrap();
+                    } else if (action === "delete") {
+                      await deleteStream(stream.id).unwrap();
+                      navigate("/streams");
+                    }
+                  }}
+                >
+                  {confirmAction === "publish"
+                    ? isPublished
+                      ? "Publishing..."
+                      : "Publish"
+                    : confirmAction === "unpublish"
+                      ? isUnpublished
+                        ? "Unpublishing..."
+                        : "Unpublish"
+                      : isDeleting
+                        ? "Deleting..."
+                        : "Delete"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       )}
 

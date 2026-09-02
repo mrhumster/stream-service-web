@@ -1,5 +1,6 @@
 import { ModeToggle } from "@/components/mode-toggle";
 import { Link, Outlet } from "react-router-dom";
+import { Menu } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -7,6 +8,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/8bit/dropdown-menu";
+import { Button } from "@/components/ui/8bit/button";
 import { LoginForm } from "@/components/ui/login-form";
 import { RegisterForm } from "@/components/ui/register-form";
 import { useAuth } from "@/hooks/useAuth";
@@ -22,7 +30,7 @@ export const MainLayout = () => {
   const auth = useAuth();
   const [logout] = useLogoutMutation();
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
+    <div className="min-h-screen flex flex-col bg-background bg-noise text-foreground">
       <header className="border-b-4 border-primary p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.1)]">
         <div className="container mx-auto flex justify-between items-center">
           {/* Логотип */}
@@ -39,7 +47,7 @@ export const MainLayout = () => {
               <li>
                 <Link
                   to="/streams"
-                  className="uppercase font-bold hover:text-primary transition-colors"
+                  className="uppercase font-bold hover:text-primary hover:underline underline-offset-4 decoration-4 transition-colors"
                 >
                   Streams
                 </Link>
@@ -49,7 +57,7 @@ export const MainLayout = () => {
                   <li className="flex items-center gap-3">
                     <Link
                       to="/streams/own"
-                      className="uppercase font-bold hover:text-primary transition-colors"
+                      className="uppercase font-bold hover:text-primary hover:underline underline-offset-4 decoration-4 transition-colors"
                     >
                       My Videos
                     </Link>
@@ -60,7 +68,7 @@ export const MainLayout = () => {
                       onOpenChange={setIsProfileOpen}
                     >
                       <DialogTrigger asChild>
-                        <button className="uppercase font-bold hover:text-primary transition-colors">
+                        <button className="uppercase font-bold hover:text-primary hover:underline underline-offset-4 decoration-4 transition-colors">
                           {data?.email}
                         </button>
                       </DialogTrigger>
@@ -158,6 +166,44 @@ export const MainLayout = () => {
                 </Dialog>
               )}
             </ul>
+            <div className="md:hidden">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="pixel-border"
+                    aria-label="Menu"
+                  >
+                    <Menu className="h-[1.2rem] w-[1.2rem]" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link to="/streams">Streams</Link>
+                  </DropdownMenuItem>
+                  {auth.isAuth && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/streams/own">My Videos</Link>
+                    </DropdownMenuItem>
+                  )}
+                  {auth.isAuth ? (
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onSelect={() => logout()}
+                    >
+                      Logout
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem
+                      onSelect={() => setIsModalOpen(true)}
+                    >
+                      Sign In
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
             <ModeToggle />
           </nav>
         </div>

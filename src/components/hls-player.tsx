@@ -56,6 +56,10 @@ export const HLSPlayer = ({ src }: { src: string }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  const [showControls, setShowControls] = useState(false);
+  const isTouch =
+    typeof window !== "undefined" &&
+    window.matchMedia("(pointer: coarse)").matches;
   const [showHelp, setShowHelp] = useState(false);
   const [volFlash, setVolFlash] = useState<{
     dir: "up" | "down";
@@ -74,6 +78,43 @@ export const HLSPlayer = ({ src }: { src: string }) => {
     return () =>
       document.removeEventListener("fullscreenchange", onFullscreenChange);
   }, []);
+
+  useEffect(() => {
+    if (!isTouch) return;
+    const mql = window.matchMedia("(orientation: landscape)");
+    const onChange = (e: MediaQueryListEvent) => {
+      const el = wrapperRef.current;
+      if (!el) return;
+      if (e.matches) {
+        if (document.fullscreenElement === el) return;
+        el.requestFullscreen?.()
+          .catch(() => {
+            setIsWide(true);
+          });
+      } else {
+        setIsWide(false);
+        if (document.fullscreenElement === el) {
+          document
+            .exitFullscreen()
+            .catch(() => undefined);
+        }
+      }
+    };
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, [isTouch]);
+
+  useEffect(() => {
+    if (!isWide && !isFullscreen) return;
+    const prevOverflow = document.body.style.overflow;
+    const prevOverscroll = document.body.style.overscrollBehavior;
+    document.body.style.overflow = "hidden";
+    document.body.style.overscrollBehavior = "none";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.body.style.overscrollBehavior = prevOverscroll;
+    };
+  }, [isWide, isFullscreen]);
 
   const togglePlay = () => {
     const video = videoRef.current;
@@ -126,6 +167,12 @@ export const HLSPlayer = ({ src }: { src: string }) => {
       nonce: (f?.nonce ?? 0) + 1,
     }));
   };
+
+  useEffect(() => {
+    if (!isTouch || !showControls) return;
+    const t = setTimeout(() => setShowControls(false), 3000);
+    return () => clearTimeout(t);
+  }, [isTouch, showControls]);
 
   useEffect(() => {
     const isActive = () =>
@@ -253,7 +300,7 @@ export const HLSPlayer = ({ src }: { src: string }) => {
       onBlur={() => setIsFocused(false)}
       className={`group outline-none w-full overflow-hidden ${
         isWide
-          ? "fixed inset-0 z-50 bg-zinc-950 flex items-center justify-center"
+          ? "fixed inset-0 z-50 h-[100dvh] w-screen overflow-hidden overscroll-none touch-none bg-zinc-950 flex items-center justify-center"
           : "relative aspect-video bg-zinc-950 rounded-xl"
       }`}
     >
@@ -342,7 +389,13 @@ export const HLSPlayer = ({ src }: { src: string }) => {
             className="w-full h-full max-h-[inherit] object-contain cursor-pointer"
             autoPlay
             playsInline
-            onClick={togglePlay}
+            onClick={() => {
+              if (isTouch) {
+                setShowControls((v) => !v);
+                return;
+              }
+              togglePlay();
+            }}
             onPlay={() => setIsPlaying(true)}
             onPause={() => setIsPlaying(false)}
             onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
@@ -354,7 +407,11 @@ export const HLSPlayer = ({ src }: { src: string }) => {
           />
 
           {/* Custom Controls */}
-          <div className="absolute bottom-0 inset-x-0 z-10 px-3 pb-2 pt-8 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <div className={`absolute bottom-0 inset-x-0 z-10 px-2 pb-1.5 pt-4 sm:px-3 sm:pb-2 sm:pt-8 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-200 ${
+            showControls
+              ? "opacity-100"
+              : "opacity-0 group-hover:opacity-100"
+          }`}>
             <input
               type="range"
               min={0}
@@ -368,7 +425,7 @@ export const HLSPlayer = ({ src }: { src: string }) => {
               }}
               className="w-full h-1 cursor-pointer accent-white"
             />
-            <div className="flex items-center gap-2 mt-1.5">
+            <div className="flex items-center gap-1.5 mt-1 sm:gap-2 sm:mt-1.5 min-w-0">
               <button
                 onClick={togglePlay}
                 title={isPlaying ? "Pause" : "Play"}
@@ -381,7 +438,7 @@ export const HLSPlayer = ({ src }: { src: string }) => {
                 )}
               </button>
 
-              <span className="text-[10px] font-bold uppercase tracking-wider text-white/90 shrink-0 tabular-nums">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-white/90 shrink-0 tabular-nums">
                 {formatTime(currentTime)} / {formatTime(duration)}
               </span>
 
@@ -413,7 +470,7 @@ export const HLSPlayer = ({ src }: { src: string }) => {
                     video.muted = v === 0;
                   }
                 }}
-                className="w-20 h-1 cursor-pointer accent-white shrink-0"
+                className="hidden md:block w-20 md:w-20 h-1 cursor-pointer accent-white shrink-0"
               />
 
               <button
@@ -431,7 +488,7 @@ export const HLSPlayer = ({ src }: { src: string }) => {
               <button
                 onClick={() => setShowHelp((v) => !v)}
                 title="Keyboard shortcuts (H)"
-                className="cursor-pointer text-white hover:text-zinc-300 transition-colors shrink-0"
+                className="hidden md:inline-flex cursor-pointer text-white hover:text-zinc-300 transition-colors shrink-0"
               >
                 <Keyboard className="size-5" />
               </button>
