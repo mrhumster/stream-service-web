@@ -30,7 +30,7 @@ export const MainLayout = () => {
   const auth = useAuth();
   const [logout] = useLogoutMutation();
   return (
-    <div className="min-h-screen flex flex-col bg-background bg-noise text-foreground">
+    <div className="min-h-screen flex flex-col bg-background text-foreground">
       <header className="border-b-4 border-primary p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.1)]">
         <div className="container mx-auto flex justify-between items-center">
           {/* Логотип */}
