@@ -68,8 +68,8 @@ export const MainPage = () => {
             key={f.title}
             className="rounded-none py-0 border-4 border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,0.3)]"
           >
-            <CardHeader className="border-b-2 border-foreground/10 bg-muted/30 py-4">
-              <CardTitle className="flex items-center gap-0 text-sm uppercase tracking-tight">
+            <CardHeader className="border-b-2 border-foreground/10 bg-muted/30 py-4 gap-0">
+              <CardTitle className="flex items-center gap-2 text-sm uppercase tracking-tight">
                 <f.icon className="size-4 text-primary" />
                 {f.title}
               </CardTitle>
