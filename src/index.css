@@ -127,7 +127,7 @@ body {
 }
 
 .soft {
-  --background: oklch(0.353 0.011 263.4);
+  --background: #343d3f;
   --foreground: oklch(0.75 0 0);
   --card: oklch(0.41 0.011 263.4);
   --card-foreground: oklch(0.75 0 0);
