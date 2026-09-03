@@ -87,8 +87,8 @@ export const OwnStreamsPage = () => {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold uppercase tracking-tighter select-none cursor-default">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <h2 className="text-2xl font-bold uppercase tracking-tighter select-none cursor-default whitespace-nowrap">
           My Streams
         </h2>
         <div className="flex items-center gap-2">
@@ -169,7 +169,7 @@ export const OwnStreamsPage = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12" />
+              <TableHead className="w-12 hidden sm:table-cell" />
               <TableHead>
                 <button
                   type="button"
@@ -179,7 +179,7 @@ export const OwnStreamsPage = () => {
                   Title <SortIcon field="title" activeField={sortField} direction={sortDir} />
                 </button>
               </TableHead>
-              <TableHead className="w-28">
+              <TableHead className="w-28 hidden sm:table-cell">
                 <button
                   type="button"
                   onClick={() => handleSort("status")}
@@ -188,8 +188,8 @@ export const OwnStreamsPage = () => {
                   Status <SortIcon field="status" activeField={sortField} direction={sortDir} />
                 </button>
               </TableHead>
-              <TableHead className="w-24">Visibility</TableHead>
-              <TableHead className="w-20">Duration</TableHead>
+              <TableHead className="w-24 hidden sm:table-cell">Visibility</TableHead>
+              <TableHead className="w-20 hidden sm:table-cell">Duration</TableHead>
               <TableHead className="w-32">
                 <button
                   type="button"
@@ -211,7 +211,7 @@ export const OwnStreamsPage = () => {
                   onClick={() => navigate(`/streams/${stream.id}`)}
                 >
                   {/* Thumbnail */}
-                  <TableCell className="p-1.5">
+                  <TableCell className="p-1.5 hidden sm:table-cell">
                     {hasThumbnail(stream.status) ? (
                       <img
                         src={thumbnailUrl(stream.id)}
@@ -227,14 +227,14 @@ export const OwnStreamsPage = () => {
                   </TableCell>
 
                   {/* Title */}
-                  <TableCell>
-                    <span className="text-xs font-bold uppercase tracking-tight truncate block max-w-[200px]">
+                  <TableCell className="py-2">
+                    <span className="text-xs font-bold uppercase tracking-tight truncate block max-w-[120px] sm:max-w-[200px]">
                       {stream.title}
                     </span>
                   </TableCell>
 
                   {/* Status */}
-                  <TableCell>
+                  <TableCell className="hidden sm:table-cell">
                     <span
                       className={cn(
                         "inline-block px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
@@ -246,14 +246,14 @@ export const OwnStreamsPage = () => {
                   </TableCell>
 
                   {/* Visibility */}
-                  <TableCell>
+                  <TableCell className="hidden sm:table-cell">
                     <span className="text-[10px] uppercase text-muted-foreground">
                       {stream.visibility}
                     </span>
                   </TableCell>
 
                   {/* Duration */}
-                  <TableCell>
+                  <TableCell className="hidden sm:table-cell">
                     <span className="text-[10px] uppercase text-muted-foreground tabular-nums">
                       {stream.metadata?.duration
                         ? formatDuration(stream.metadata.duration)

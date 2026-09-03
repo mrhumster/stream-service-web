@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
+import { HLSPlayer } from "@/components/hls-player"
+import { useVideoUrl } from "@/hooks/useVideoUrl"
 import { useGetStreamQuery, useUpdateStreamMutation } from "@/services/streams"
 import { useAppSelector } from "@/hooks"
 import { cn, getErrorMessage } from "@/lib/utils"
@@ -54,8 +56,13 @@ function EditStreamForm({ stream }: { stream: StreamResponse }) {
     }
   }
 
+  const isReady = stream.status === "ready" || stream.status === "published"
+  const { url: videoUrl } = useVideoUrl(stream.id)
+
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6">
+      {isReady && videoUrl && <HLSPlayer src={videoUrl} />}
+      <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       {/* Title */}
       <div className="flex flex-col gap-2">
         <Label htmlFor="title" className="text-[10px] uppercase">
@@ -155,7 +162,8 @@ function EditStreamForm({ stream }: { stream: StreamResponse }) {
       >
         {isUpdating ? "Updating..." : "Update Stream"}
       </Button>
-    </form>
+      </form>
+    </div>
   )
 }
 
