@@ -15,7 +15,11 @@ export const useMultipartUpload = () => {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  const processUpload = async (streamID: string, file: File) => {
+  const processUpload = async (
+    streamID: string,
+    file: File,
+    onProgress?: (progress: number) => void,
+  ) => {
     setIsUploading(true);
     setError(null);
     setProgress(0);
@@ -51,6 +55,7 @@ export const useMultipartUpload = () => {
               (uploadedPartsCount / totalParts) * 100,
             );
             setProgress(currentProgress);
+            onProgress?.(currentProgress);
             return { part_number: partNumber, etag: res.etag };
           } catch {
             if (attempt >= MAX_PART_ATTEMPTS) {
@@ -81,6 +86,7 @@ export const useMultipartUpload = () => {
         },
       }).unwrap();
       setProgress(100);
+      onProgress?.(100);
       return { success: true };
     } catch (err) {
       const message =

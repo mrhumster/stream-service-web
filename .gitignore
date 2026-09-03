@@ -18,6 +18,7 @@ dist-ssr
 # Obsidian vault (project memory, local only)
 .obsidian/
 _notes/
+.opencode/
 !.vscode/extensions.json
 .idea
 .DS_Store

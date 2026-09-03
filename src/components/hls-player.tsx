@@ -43,6 +43,7 @@ function VolumeIcon({
 
 export const HLSPlayer = ({ src }: { src: string }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const bgVideoRef = useRef<HTMLVideoElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const { isAuth, token, isInitializing } = useAuth();
   const [isForbidden, setIsForbidden] = useState<boolean>(false);
@@ -232,37 +233,39 @@ export const HLSPlayer = ({ src }: { src: string }) => {
     if (isInitializing) return;
 
     const video = videoRef.current;
+    const bgVideo = bgVideoRef.current;
     if (!video) return;
 
     let hls: Hls | null = null;
+    let bgHls: Hls | null = null;
     const antiCacheUrl = src.includes("?")
       ? `${src}&t=${Date.now()}`
       : `${src}?t=${Date.now()}`;
 
+    const makeXhrSetup = () => (xhr: XMLHttpRequest, url: string) => {
+      if (url.includes(window.location.host) || !url.startsWith("http")) {
+        const baseUrl = src.substring(0, src.lastIndexOf("/") + 1);
+        const fileName = url.split("/").pop();
+        const correctedUrl = new URL(fileName!, baseUrl).href;
+        xhr.open("GET", correctedUrl, true);
+      }
+      if (isAuth) {
+        xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+      }
+    };
+
     if (video.canPlayType("application/vnd.apple.mpegcurl")) {
       video.src = src;
+      if (bgVideo) bgVideo.src = src;
     } else if (Hls.isSupported()) {
       hls = new Hls({
         enableWorker: false,
         manifestLoadingMaxRetry: 1,
-        xhrSetup: (xhr, url) => {
-          console.log("HLS requesting:", url);
-          if (url.includes(window.location.host) || !url.startsWith("http")) {
-            const baseUrl = src.substring(0, src.lastIndexOf("/") + 1);
-            const fileName = url.split("/").pop();
-            const correctedUrl = new URL(fileName!, baseUrl).href;
-            xhr.open("GET", correctedUrl, true);
-            console.log("Corrected URL:", correctedUrl); // Проверь в консоли!
-          }
-          if (isAuth) {
-            xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-          }
-        },
+        xhrSetup: makeXhrSetup(),
       });
-      hls.on(Hls.Events.MANIFEST_LOADED, (_event, data) => {
+      hls.on(Hls.Events.MANIFEST_LOADED, () => {
         setIsForbidden(false);
         setErrorMessage(null);
-        console.log("Manifest loaded, levels found:", data.levels.length);
       });
       hls.on(Hls.Events.ERROR, (_event, data) => {
         console.error("HLS Error Detail:", data);
@@ -274,18 +277,29 @@ export const HLSPlayer = ({ src }: { src: string }) => {
       });
       hls.loadSource(antiCacheUrl);
       hls.attachMedia(video);
+
+      if (bgVideo) {
+        bgHls = new Hls({
+          enableWorker: false,
+          manifestLoadingMaxRetry: 1,
+          xhrSetup: makeXhrSetup(),
+        });
+        bgHls.loadSource(antiCacheUrl);
+        bgHls.attachMedia(bgVideo);
+      }
+
       return () => {
-        if (hls) {
-          hls.destroy();
-        }
+        if (hls) hls.destroy();
+        if (bgHls) bgHls.destroy();
         video.src = "";
+        if (bgVideo) bgVideo.src = "";
       };
     }
   }, [src, isAuth, token, isInitializing]);
 
   if (isInitializing) {
     return (
-      <div className="w-full aspect-video bg-zinc-950 animate-pulse rounded-xl" />
+      <div className="w-full aspect-video bg-zinc-950 animate-pulse rounded-none" />
     );
   }
 
@@ -301,7 +315,7 @@ export const HLSPlayer = ({ src }: { src: string }) => {
       className={`group outline-none w-full overflow-hidden ${
         isWide
           ? "fixed inset-0 z-50 h-[100dvh] w-screen overflow-hidden overscroll-none touch-none bg-zinc-950 flex items-center justify-center"
-          : "relative aspect-video bg-zinc-950 rounded-xl"
+          : "relative aspect-video bg-zinc-950 rounded-none"
       }`}
     >
       {isForbidden ? (
@@ -385,8 +399,15 @@ export const HLSPlayer = ({ src }: { src: string }) => {
             </div>
           )}
           <video
+            ref={bgVideoRef}
+            className="absolute inset-0 w-full h-full object-cover blur-2xl scale-110 pointer-events-none"
+            muted
+            playsInline
+            autoPlay
+          />
+          <video
             ref={videoRef}
-            className="w-full h-full max-h-[inherit] object-contain cursor-pointer"
+            className="relative z-10 w-full h-full max-h-[inherit] object-contain cursor-pointer"
             autoPlay
             playsInline
             onClick={() => {
@@ -396,9 +417,22 @@ export const HLSPlayer = ({ src }: { src: string }) => {
               }
               togglePlay();
             }}
-            onPlay={() => setIsPlaying(true)}
-            onPause={() => setIsPlaying(false)}
-            onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+            onPlay={() => {
+              setIsPlaying(true);
+              bgVideoRef.current?.play().catch(() => undefined);
+            }}
+            onPause={() => {
+              setIsPlaying(false);
+              if (bgVideoRef.current && !bgVideoRef.current.paused) {
+                bgVideoRef.current.pause();
+              }
+            }}
+            onTimeUpdate={(e) => {
+              setCurrentTime(e.currentTarget.currentTime);
+              if (bgVideoRef.current) {
+                bgVideoRef.current.currentTime = e.currentTarget.currentTime;
+              }
+            }}
             onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
             onVolumeChange={(e) => {
               setVolume(e.currentTarget.volume);

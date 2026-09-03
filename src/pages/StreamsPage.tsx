@@ -1,15 +1,17 @@
-import { useState, useRef, useEffect, useCallback } from "react"
-import { Link } from "react-router-dom"
+import { useRef, useEffect, useCallback } from "react"
+import { Link, useSearchParams } from "react-router-dom"
 import { StreamCard } from "@/components/stream-card"
 import { useAuth } from "@/hooks/useAuth"
 import { useListStreamsPublicQuery } from "@/services/streams"
-import { Plus, Loader2 } from "lucide-react"
+import { Plus, Loader2, X } from "lucide-react"
 
 const PAGE_SIZE = 9
 
 export const StreamsPage = () => {
   const { isAuth } = useAuth()
-  const [offset, setOffset] = useState(0)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const activeTag = searchParams.get("tag") ?? ""
+  const offset = Number(searchParams.get("offset") ?? "0")
   const sentinelRef = useRef<HTMLDivElement>(null)
 
   const { data, isLoading, isFetching, error } = useListStreamsPublicQuery({
@@ -17,13 +19,25 @@ export const StreamsPage = () => {
     offset,
   })
 
-  const hasMore = data ? data.items.length < data.total : true
+  const filteredItems = activeTag
+    ? data?.items.filter((s) => s.tags?.some((t) => t === activeTag)) ?? []
+    : data?.items ?? []
+
+  const hasMore = data
+    ? activeTag
+      ? filteredItems.length < data.total
+      : data.items.length < data.total
+    : true
 
   const loadMore = useCallback(() => {
     if (!isFetching && hasMore && data) {
-      setOffset(data.items.length)
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.set("offset", String(data.items.length))
+        return next
+      })
     }
-  }, [isFetching, hasMore, data])
+  }, [isFetching, hasMore, data, setSearchParams])
 
   useEffect(() => {
     const sentinel = sentinelRef.current
@@ -75,12 +89,32 @@ export const StreamsPage = () => {
         </p>
       )}
 
-      {data && data.items.length > 0 && (
+      {activeTag && !isLoading && (
+        <div className="flex items-center gap-2 mb-4 bg-primary/10 border-2 border-primary/20 px-4 py-2 text-xs uppercase font-bold">
+          <span className="text-muted-foreground">Tag:</span>
+          <span className="text-primary">#{activeTag}</span>
+          <button
+            onClick={() => setSearchParams({})}
+            className="ml-auto inline-flex items-center gap-1 text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+          >
+            <X className="size-3" />
+            Clear
+          </button>
+        </div>
+      )}
+
+      {data && filteredItems.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {data.items.map((stream) => (
+          {filteredItems.map((stream) => (
             <StreamCard key={stream.id} stream={stream} />
           ))}
         </div>
+      )}
+
+      {activeTag && !isLoading && filteredItems.length === 0 && data && data.items.length > 0 && (
+        <p className="text-center text-muted-foreground text-sm uppercase font-bold py-12">
+          No streams with tag #{activeTag}
+        </p>
       )}
 
       {/* Sentinel for IntersectionObserver */}

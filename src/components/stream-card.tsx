@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { Image } from "lucide-react"
 import {
   Card,
@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils"
 import {
   defaultStatus,
   formatDate,
+  formatDuration,
   hasThumbnail,
   statusConfig,
   thumbnailUrl,
@@ -24,19 +25,27 @@ export function StreamCard({ stream }: { stream: StreamResponse }) {
   const status = statusConfig[stream.status] ?? defaultStatus
   const [thumbnailError, setThumbnailError] = useState(false)
   const showThumbnail = hasThumbnail(stream.status) && !thumbnailError
+  const navigate = useNavigate()
 
   return (
     <Link to={`/streams/${stream.id}`} className="block">
     <Card className="rounded-none border-4 border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,0.3)] gap-4 py-0 overflow-hidden cursor-pointer transition-colors hover:border-primary">
-      <div className="aspect-video bg-muted border-b-2 border-foreground/10">
+      <div className="relative aspect-square bg-muted border-b-2 border-foreground/10 overflow-hidden">
         {showThumbnail ? (
-          <img
-            src={thumbnailUrl(stream.id)}
-            alt={stream.title}
-            loading="lazy"
-            className="h-full w-full object-cover"
-            onError={() => setThumbnailError(true)}
-          />
+          <>
+            <img
+              src={thumbnailUrl(stream.id)}
+              alt={stream.title}
+              loading="lazy"
+              className="w-full h-full object-cover aspect-square"
+              onError={() => setThumbnailError(true)}
+            />
+            {stream.metadata?.duration != null && stream.metadata.duration > 0 && (
+              <span className="absolute bottom-1.5 right-1.5 z-10 bg-black/80 px-1.5 py-0.5 text-[8px] font-['Press_Start_2P'] text-white uppercase tracking-wider">
+                {formatDuration(stream.metadata.duration)}
+              </span>
+            )}
+          </>
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2">
             <Image className="size-8 text-muted-foreground/60" />
@@ -66,7 +75,12 @@ export function StreamCard({ stream }: { stream: StreamResponse }) {
             {stream.tags.map((tag) => (
               <span
                 key={tag}
-                className="bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-bold uppercase"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  navigate(`/streams?tag=${encodeURIComponent(tag)}`)
+                }}
+                className="bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-bold uppercase cursor-pointer hover:bg-primary/20 transition-colors"
               >
                 {tag}
               </span>

@@ -8,6 +8,7 @@ import { StreamPage } from "./pages/StreamPage";
 import { ProtectedRoute } from "./components/protected-route";
 import { ThemeProvider } from "@/components/theme-provider";
 import { OwnStreamsPage } from "./pages/OwnStreamsPage";
+import { Toaster } from "sonner";
 
 const router = createBrowserRouter([
   {
@@ -32,6 +33,7 @@ function App() {
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
       <RouterProvider router={router} />
+      <Toaster position="bottom-left" richColors={false} />
     </ThemeProvider>
   );
 }

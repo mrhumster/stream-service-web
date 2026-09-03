@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import {
   Dialog,
@@ -24,7 +25,7 @@ import {
   formatDate,
 } from "@/lib/stream-format";
 import { useAppSelector } from "@/hooks";
-import { cn } from "@/lib/utils";
+import { cn, getErrorMessage } from "@/lib/utils";
 import { ArrowLeft, Lock, PenSquare, Delete, Globe } from "pixelarticons/react";
 import { HLSPlayer } from "@/components/hls-player";
 import ProgressBar from "@/components/ui/8bit/progress-bar";
@@ -238,14 +239,18 @@ export const StreamPage = () => {
                   }
                   onClick={async () => {
                     const action = confirmAction;
-                    setConfirmAction(null);
-                    if (action === "publish") {
-                      await publishStream({ id: stream.id }).unwrap();
-                    } else if (action === "unpublish") {
-                      await unpublishStream({ id: stream.id }).unwrap();
-                    } else if (action === "delete") {
-                      await deleteStream(stream.id).unwrap();
-                      navigate("/streams");
+                    try {
+                      if (action === "publish") {
+                        await publishStream({ id: stream.id }).unwrap();
+                      } else if (action === "unpublish") {
+                        await unpublishStream({ id: stream.id }).unwrap();
+                      } else if (action === "delete") {
+                        await deleteStream(stream.id).unwrap();
+                        navigate("/streams");
+                      }
+                      setConfirmAction(null);
+                    } catch (err) {
+                      toast.error(getErrorMessage(err));
                     }
                   }}
                 >
@@ -296,12 +301,13 @@ export const StreamPage = () => {
               </span>
               <div className="flex flex-wrap gap-1 mt-1">
                 {stream.tags.map((tag) => (
-                  <span
+                  <Link
                     key={tag}
-                    className="bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-bold uppercase"
+                    to={`/streams?tag=${encodeURIComponent(tag)}`}
+                    className="bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-bold uppercase hover:bg-primary/20 transition-colors"
                   >
                     {tag}
-                  </span>
+                  </Link>
                 ))}
               </div>
             </div>

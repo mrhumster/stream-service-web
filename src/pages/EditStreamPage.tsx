@@ -1,12 +1,13 @@
 import { useState, type KeyboardEvent } from "react"
 import { Link, useParams, useNavigate } from "react-router-dom"
+import { toast } from "sonner"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { useGetStreamQuery, useUpdateStreamMutation } from "@/services/streams"
 import { useAppSelector } from "@/hooks"
-import { cn } from "@/lib/utils"
+import { cn, getErrorMessage } from "@/lib/utils"
 import { ArrowLeft, Lock, X } from "lucide-react"
 import type { StreamResponse, StreamVisibility } from "@/types/stream.types"
 
@@ -49,7 +50,7 @@ function EditStreamForm({ stream }: { stream: StreamResponse }) {
       }).unwrap()
       navigate(`/streams/${stream.id}`)
     } catch (err) {
-      console.error("Failed to update stream:", err)
+      toast.error(getErrorMessage(err))
     }
   }
 
