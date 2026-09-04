@@ -123,6 +123,34 @@ export const streamApi = createApi({
             ]
           : [{ type: "Stream" as const, id: "LIST" }],
     }),
+    listStreamsSidebar: builder.query<StreamListResponse, StreamListParams>({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        searchParams.set("limit", String(params.limit ?? 10));
+        searchParams.set("offset", String(params.offset ?? 0));
+        return `stream?${searchParams.toString()}`;
+      },
+      serializeQueryArgs: ({ endpointName }) => endpointName,
+      merge: (currentCache, newItems) => {
+        if (newItems.offset === 0) return newItems;
+        return {
+          ...newItems,
+          items: [...currentCache.items, ...newItems.items],
+        };
+      },
+      forceRefetch: ({ currentArg, previousArg }) =>
+        currentArg?.offset !== previousArg?.offset,
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.items.map(({ id }: { id: string }) => ({
+                type: "Stream" as const,
+                id,
+              })),
+              { type: "Stream" as const, id: "LIST" },
+            ]
+          : [{ type: "Stream" as const, id: "LIST" }],
+    }),
     getStream: builder.query<StreamResponse, string>({
       query: (id) => `stream/${id}`,
       providesTags: (_result, _error, id) => [{ type: "Stream" as const, id }],
@@ -212,6 +240,7 @@ export const streamApi = createApi({
 
 export const {
   useListStreamsPublicQuery,
+  useListStreamsSidebarQuery,
   useGetStreamQuery,
   useCreateStreamMutation,
   useUpdateStreamMutation,

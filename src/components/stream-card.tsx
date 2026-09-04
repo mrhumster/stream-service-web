@@ -21,7 +21,7 @@ import {
 } from "@/lib/stream-format"
 import type { StreamResponse } from "@/types/stream.types"
 
-export function StreamCard({ stream }: { stream: StreamResponse }) {
+export function StreamCard({ stream, showMeta = true }: { stream: StreamResponse; showMeta?: boolean }) {
   const status = statusConfig[stream.status] ?? defaultStatus
   const [thumbnailError, setThumbnailError] = useState(false)
   const showThumbnail = hasThumbnail(stream.status) && !thumbnailError
@@ -45,6 +45,23 @@ export function StreamCard({ stream }: { stream: StreamResponse }) {
                 {formatDuration(stream.metadata.duration)}
               </span>
             )}
+            {!showMeta && stream.tags && stream.tags.length > 0 && (
+              <div className="absolute bottom-1.5 left-1.5 z-10 flex gap-1">
+                {stream.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      navigate(`/streams?tag=${encodeURIComponent(tag)}`)
+                    }}
+                    className="bg-black/80 px-1.5 py-0.5 text-[8px] text-white font-bold uppercase cursor-pointer hover:bg-black/90 transition-colors"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
           </>
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2">
@@ -64,42 +81,46 @@ export function StreamCard({ stream }: { stream: StreamResponse }) {
         </CardDescription>
       </CardHeader>
 
-      <CardContent className="px-4 py-0">
-        <div className="flex items-center gap-2 text-[10px] uppercase text-muted-foreground">
-          <span className="font-bold">Visibility:</span>
-          <span>{stream.visibility}</span>
-        </div>
-
-        {stream.tags && stream.tags.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1">
-            {stream.tags.map((tag) => (
-              <span
-                key={tag}
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  navigate(`/streams?tag=${encodeURIComponent(tag)}`)
-                }}
-                className="bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-bold uppercase cursor-pointer hover:bg-primary/20 transition-colors"
-              >
-                {tag}
-              </span>
-            ))}
+      {showMeta && (
+        <CardContent className="px-4 py-0">
+          <div className="flex items-center gap-2 text-[10px] uppercase text-muted-foreground">
+            <span className="font-bold">Visibility:</span>
+            <span>{stream.visibility}</span>
           </div>
-        )}
-      </CardContent>
 
-      <CardFooter className="flex items-center justify-between border-t-2 border-foreground/10 px-4 py-2 text-[10px] text-muted-foreground">
-        <span>{formatDate(stream.created_at)}</span>
-        <span
-          className={cn(
-            "shrink-0 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
-            status.className,
+          {stream.tags && stream.tags.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {stream.tags.map((tag) => (
+                <span
+                  key={tag}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    navigate(`/streams?tag=${encodeURIComponent(tag)}`)
+                  }}
+                  className="bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-bold uppercase cursor-pointer hover:bg-primary/20 transition-colors"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
           )}
-        >
-          {status.label}
-        </span>
-      </CardFooter>
+        </CardContent>
+      )}
+
+      {showMeta && (
+        <CardFooter className="flex items-center justify-between border-t-2 border-foreground/10 px-4 py-2 text-[10px] text-muted-foreground">
+          <span>{formatDate(stream.created_at)}</span>
+          <span
+            className={cn(
+              "shrink-0 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+              status.className,
+            )}
+          >
+            {status.label}
+          </span>
+        </CardFooter>
+      )}
     </Card>
     </Link>
   )

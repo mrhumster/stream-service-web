@@ -90,6 +90,8 @@ export const CreateStreamPage = () => {
   const batchAbortRef = useRef(false);
   const [batchComplete, setBatchComplete] = useState(false);
   const [countdown, setCountdown] = useState(10);
+  const [batchTags, setBatchTags] = useState<string[]>([]);
+  const [batchTagInput, setBatchTagInput] = useState("");
 
   const batchDoneCount = batchQueue.filter(
     (i) => i.status === "done",
@@ -124,6 +126,20 @@ export const CreateStreamPage = () => {
     }
   };
   const removeTag = (tag: string) => setTags(tags.filter((t) => t !== tag));
+
+  // ── Tag handling (batch) ──
+  const handleBatchTagKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const value = batchTagInput.trim().toLowerCase();
+      if (value && !batchTags.includes(value)) {
+        setBatchTags([...batchTags, value]);
+      }
+      setBatchTagInput("");
+    }
+  };
+  const removeBatchTag = (tag: string) =>
+    setBatchTags(batchTags.filter((t) => t !== tag));
 
   // ── Single submit ──
   const handleSingleSubmit = async (e: React.FormEvent) => {
@@ -193,7 +209,7 @@ export const CreateStreamPage = () => {
         const stream = await createStream({
           title: item.title,
           description: "",
-          tags: [],
+          tags: batchTags,
           visibility: "public",
         }).unwrap();
         const streamId = stream.id;
@@ -217,7 +233,7 @@ export const CreateStreamPage = () => {
         return false;
       }
     },
-    [createStream, uploadVideo, processUpload, updateBatchItem],
+    [createStream, uploadVideo, processUpload, updateBatchItem, batchTags],
   );
 
   // ── Batch: start upload ──
@@ -278,6 +294,8 @@ export const CreateStreamPage = () => {
     setBatchQueue([]);
     setBatchComplete(false);
     setCountdown(10);
+    setBatchTags([]);
+    setBatchTagInput("");
   }, [isBatchRunning]);
 
   return (
@@ -456,6 +474,41 @@ export const CreateStreamPage = () => {
                 onFilesSelected={handleBatchFiles}
                 disabled={isBatchRunning}
               />
+
+              {/* Batch tags */}
+              {!isBatchRunning && (
+                <div className="flex flex-col gap-2">
+                  <Label className="text-[10px] uppercase">
+                    Tags (applied to all)
+                  </Label>
+                  <Input
+                    value={batchTagInput}
+                    onChange={(e) => setBatchTagInput(e.target.value)}
+                    onKeyDown={handleBatchTagKeyDown}
+                    placeholder="TYPE AND PRESS ENTER"
+                    className={cn(inputClassName, "placeholder:opacity-30")}
+                  />
+                  {batchTags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {batchTags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="inline-flex items-center gap-1 bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-bold uppercase"
+                        >
+                          {tag}
+                          <button
+                            type="button"
+                            onClick={() => removeBatchTag(tag)}
+                            className="hover:text-destructive"
+                          >
+                            <X className="size-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Queue */}
               {batchQueue.length > 0 && !batchComplete && (
