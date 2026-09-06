@@ -41,7 +41,7 @@ function VolumeIcon({
   return <Volume2 className={size} />;
 }
 
-export const HLSPlayer = ({ src }: { src: string }) => {
+export const HLSPlayer = ({ src, autoplay = true }: { src: string; autoplay?: boolean }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const bgVideoRef = useRef<HTMLVideoElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -403,12 +403,12 @@ export const HLSPlayer = ({ src }: { src: string }) => {
             className="absolute inset-0 w-full h-full object-cover blur-2xl scale-110 pointer-events-none"
             muted
             playsInline
-            autoPlay
+            autoPlay={autoplay}
           />
           <video
             ref={videoRef}
             className="relative z-10 w-full h-full max-h-[inherit] object-contain cursor-pointer"
-            autoPlay
+            autoPlay={autoplay}
             playsInline
             onClick={() => {
               if (isTouch) {

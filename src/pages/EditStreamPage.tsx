@@ -18,6 +18,7 @@ const inputClassName =
 
 function EditStreamForm({ stream }: { stream: StreamResponse }) {
   const navigate = useNavigate()
+  const autoplay = useAppSelector((s) => s.settings.autoplay)
   const [updateStream, { isLoading: isUpdating }] = useUpdateStreamMutation()
 
   const [title, setTitle] = useState(stream.title)
@@ -61,7 +62,7 @@ function EditStreamForm({ stream }: { stream: StreamResponse }) {
 
   return (
     <div className="flex flex-col gap-6">
-      {isReady && videoUrl && <HLSPlayer src={videoUrl} />}
+      {isReady && videoUrl && <HLSPlayer src={videoUrl} autoplay={autoplay} />}
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       {/* Title */}
       <div className="flex flex-col gap-2">

@@ -9,6 +9,7 @@ import { ProtectedRoute } from "./components/protected-route";
 import { ThemeProvider } from "@/components/theme-provider";
 import { OwnStreamsPage } from "./pages/OwnStreamsPage";
 import { Toaster } from "sonner";
+import { useAppSelector } from "@/hooks";
 
 const router = createBrowserRouter([
   {
@@ -30,8 +31,10 @@ const router = createBrowserRouter([
 ]);
 
 function App() {
+  const themeSetting = useAppSelector((s) => s.settings.theme);
+
   return (
-    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+    <ThemeProvider defaultTheme={themeSetting} storageKey="vite-ui-theme">
       <RouterProvider router={router} />
       <Toaster position="bottom-left" richColors={false} />
     </ThemeProvider>

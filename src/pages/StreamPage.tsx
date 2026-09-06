@@ -37,6 +37,7 @@ export const StreamPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const authUser = useAppSelector((state) => state.auth.authUser);
+  const autoplay = useAppSelector((s) => s.settings.autoplay);
   const { token, isInitializing } = useAuth();
   const { data: stream, isLoading, error } = useGetStreamQuery(id!);
   const {
@@ -158,7 +159,7 @@ export const StreamPage = () => {
                     {videoError}
                   </span>
                 ) : videoUrl ? (
-                  <HLSPlayer src={videoUrl} />
+                  <HLSPlayer src={videoUrl} autoplay={autoplay} />
                 ) : null}
               </div>
             </Card>

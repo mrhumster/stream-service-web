@@ -1,6 +1,5 @@
-import { ModeToggle } from "@/components/mode-toggle";
 import { Link, Outlet } from "react-router-dom";
-import { Menu } from "lucide-react";
+import { Menu, Sun, Star, Moon, Monitor, ChevronDown } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +20,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useState } from "react";
 import { useGetAuthUserQuery } from "@/services/users";
 import { useLogoutMutation } from "@/services/auth";
+import { useAppDispatch, useAppSelector } from "@/hooks";
+import { setAutoplay, setTheme } from "@/feature/settings/settingsSlice";
+import { useTheme, type Theme } from "@/components/theme-context";
 
 export const MainLayout = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -29,6 +31,16 @@ export const MainLayout = () => {
   const { data } = useGetAuthUserQuery();
   const auth = useAuth();
   const [logout] = useLogoutMutation();
+  const dispatch = useAppDispatch();
+  const { autoplay, theme: themeSetting } = useAppSelector((s) => s.settings);
+  const { setTheme: applyTheme } = useTheme();
+
+  const themeOptions: { value: Theme; label: string; icon: React.ReactNode }[] = [
+    { value: "light", label: "Light", icon: <Sun className="size-4" /> },
+    { value: "soft", label: "Soft", icon: <Star className="size-4" /> },
+    { value: "dark", label: "Dark", icon: <Moon className="size-4" /> },
+    { value: "system", label: "System", icon: <Monitor className="size-4" /> },
+  ];
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       <header className="border-b-4 border-primary p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.1)]">
@@ -72,7 +84,7 @@ export const MainLayout = () => {
                           {data?.email}
                         </button>
                       </DialogTrigger>
-                      <DialogContent className="sm:max-w-[425px] border-4 border-primary shadow-[8px_8px_0_0_rgba(0,0,0,1)] bg-card p-0 overflow-hidden">
+                      <DialogContent className="sm:max-w-[425px] border-4 border-primary shadow-[8px_8px_0_0_rgba(0,0,0,1)] bg-card p-0 overflow-hidden [&_[data-slot=dialog-close]]:text-primary-foreground [&_[data-slot=dialog-close]]:opacity-100">
                         <DialogHeader className="bg-primary p-4 border-b-4 border-black">
                           <DialogTitle className="text-primary-foreground text-xs uppercase tracking-tighter">
                             Profile
@@ -109,6 +121,62 @@ export const MainLayout = () => {
                                     day: "numeric",
                                   },
                                 )}
+                            </div>
+                          </div>
+
+                          <div className="border-t-2 border-foreground/10 pt-4 flex flex-col gap-3">
+                            <span className="text-[10px] uppercase font-bold text-muted-foreground">
+                              Settings
+                            </span>
+
+                            {/* Autoplay toggle */}
+                            <label className="flex items-center justify-between cursor-pointer">
+                              <span className="text-sm font-bold uppercase">Autoplay</span>
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={autoplay}
+                                onClick={() => dispatch(setAutoplay(!autoplay))}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-none border-2 border-black transition-colors ${
+                                  autoplay ? "bg-green-600" : "bg-muted"
+                                }`}
+                              >
+                                <span
+                                  className={`inline-block h-4 w-4 bg-white shadow transition-transform ${
+                                    autoplay ? "translate-x-5" : "translate-x-1"
+                                  }`}
+                                />
+                              </button>
+                            </label>
+
+                            {/* Theme dropdown */}
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-bold uppercase">Theme</span>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button className="flex items-center gap-2 border-2 border-black px-3 py-1 text-xs uppercase font-bold bg-background hover:bg-accent transition-colors">
+                                    {themeOptions.find((o) => o.value === themeSetting)?.label}
+                                    <ChevronDown className="size-3" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  {themeOptions.map((opt) => (
+                                    <DropdownMenuItem
+                                      key={opt.value}
+                                      onSelect={() => {
+                                        dispatch(setTheme(opt.value));
+                                        applyTheme(opt.value);
+                                      }}
+                                    >
+                                      <span className="flex items-center gap-2">
+                                        {opt.icon}
+                                        {opt.label}
+                                        {themeSetting === opt.value && <span className="ml-auto">✓</span>}
+                                      </span>
+                                    </DropdownMenuItem>
+                                  ))}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
                           </div>
                         </div>
@@ -204,7 +272,6 @@ export const MainLayout = () => {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-            <ModeToggle />
           </nav>
         </div>
       </header>
