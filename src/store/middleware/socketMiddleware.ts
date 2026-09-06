@@ -16,7 +16,7 @@ export const socketMiddleware: Middleware<object, PartialRootState> = (store) =>
     const token = state.auth.token;
     if (token && !socket) {
       socket = new WebSocket(
-        `wss://api.example.com/stream/ws/updates?token=${token}`,
+        `${import.meta.env.VITE_WS_URL}?token=${token}`,
       );
       socket.onmessage = (event) => {
         console.log("message from back");

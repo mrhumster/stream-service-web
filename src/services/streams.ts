@@ -22,7 +22,7 @@ import type {
 } from "../types/stream.types";
 
 const baseQuery = fetchBaseQuery({
-  baseUrl: "https://api.example.com/",
+  baseUrl: import.meta.env.VITE_API_URL as string,
   credentials: "include",
   timeout: 30000,
   prepareHeaders: (headers, { getState }) => {

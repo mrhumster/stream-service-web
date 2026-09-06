@@ -11,7 +11,7 @@ import type { LoginResponse } from "../types/auth.types.ts";
 import type { UserResponse, UsersListReponse } from "../types/user.types.ts";
 
 const baseQuery = fetchBaseQuery({
-  baseUrl: "https://api.example.com/",
+  baseUrl: import.meta.env.VITE_API_URL as string,
   credentials: "include",
   timeout: 30000,
   prepareHeaders: (headers, { getState }) => {

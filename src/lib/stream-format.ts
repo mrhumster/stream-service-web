@@ -24,8 +24,7 @@ export function formatDate(dateStr: string): string {
   });
 }
 
-const THUMBNAIL_BASE_URL =
-  "https://storage.example.com/go-app-bucket/thumbnails";
+const THUMBNAIL_BASE_URL = import.meta.env.VITE_STORAGE_URL as string;
 
 export function thumbnailUrl(streamId: string): string {
   return `${THUMBNAIL_BASE_URL}/${streamId}.jpg`;

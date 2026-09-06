@@ -7,7 +7,7 @@ export const useVideoProgress = (streamId: string, token: string) => {
 
   useEffect(() => {
     const ws = new WebSocket(
-      `wss://api.example.com/stream/ws/updates?token=${token}`,
+      `${import.meta.env.VITE_WS_URL}?token=${token}`,
     );
 
     ws.onmessage = (event) => {

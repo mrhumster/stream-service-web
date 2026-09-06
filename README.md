@@ -214,11 +214,21 @@ light → soft → dark → light (Sun / Star / Moon).
 
 ## Configuration
 
-Hardcoded URLs:
-- REST API: `https://api.example.com/`
-- WebSocket: `wss://api.example.com/stream/ws/updates`
-- HLS: `https://api.example.com/stream/{id}/hls/index.m3u8`
-- Thumbnails: `https://storage.example.com/go-app-bucket/thumbnails/{id}.jpg`
+All URLs are configurable via environment variables (Vite `VITE_` prefix).
+Defaults are set in `.env` (local dev) and `Dockerfile` ARGs (Docker/K8s builds).
+
+| Variable | Default | Used in |
+| --- | --- | --- |
+| `VITE_API_URL` | `https://api.example.com` | auth.ts, users.ts, streams.ts |
+| `VITE_WS_URL` | `wss://api.example.com/stream/ws/updates` | socketMiddleware.ts, useVideoProgress.ts |
+| `VITE_HLS_URL` | `https://api.example.com` | useVideoUrl.ts |
+| `VITE_STORAGE_URL` | `https://storage.example.com/go-app-bucket/thumbnails` | stream-format.ts (thumbnails) |
+
+To override for Docker builds:
+
+```bash
+docker build --build-arg VITE_API_URL=https://your-api.example.com .
+```
 
 Path alias `@/*` → `src/*` (tsconfig + vite.config.ts).
 
@@ -235,8 +245,7 @@ Resources: 50-100m CPU, 64-128Mi memory. Probes on `/health`.
 
 - `useVideoUrl` is a stub — returns `isLoading: null`, `error: null`;
 - `LoginPage` is legacy, not styled with 8-bit theme;
-- `HomePage` is a placeholder;
-- Base URLs are hardcoded (no env var support yet).
+- `HomePage` is a placeholder.
 
 ## Troubleshooting
 
