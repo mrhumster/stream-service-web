@@ -277,7 +277,7 @@ export const OwnStreamsPage = () => {
       {/* Sentinel for IntersectionObserver */}
       <div ref={sentinelRef} className="h-1" />
 
-      {isFetching && !isLoading && (
+      {isFetching && !isLoading && data && data.items.length > 0 && (
         <div className="flex justify-center py-6">
           <Loader2 className="size-6 animate-spin text-muted-foreground" />
         </div>
