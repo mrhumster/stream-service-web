@@ -243,9 +243,8 @@ Resources: 50-100m CPU, 64-128Mi memory. Probes on `/health`.
 
 ## Known Issues
 
-- `useVideoUrl` is a stub — returns `isLoading: null`, `error: null`;
-- `LoginPage` is legacy, not styled with 8-bit theme;
-- `HomePage` is a placeholder.
+- `useVideoUrl` is a stub — returns `isLoading: null`, `error: null`
+  (dead branches in StreamPage can never trigger loading/error states).
 
 ## Troubleshooting
 

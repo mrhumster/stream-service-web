@@ -19,10 +19,8 @@ export const socketMiddleware: Middleware<object, PartialRootState> = (store) =>
         `${import.meta.env.VITE_WS_URL}?token=${token}`,
       );
       socket.onmessage = (event) => {
-        console.log("message from back");
         try {
           const data = JSON.parse(event.data);
-          console.log("received message", data);
           if (data.type === "STREAM_UPDATED") {
             store.dispatch(
               streamApi.util.invalidateTags([
