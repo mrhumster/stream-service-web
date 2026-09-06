@@ -1,178 +1,297 @@
 # GoCast — Web Frontend
 
-SPA фронтенд видеохостинга/стримингового сервиса GoCast. Позволяет загружать
-видео, следить за транскодингом, публиковать и смотреть стримы через HLS-плеер,
-управляя доступом (public/private/unlisted) и авторизацией по токенам.
+SPA frontend for the GoCast video hosting/streaming service. Upload videos,
+track transcoding, publish and watch streams via HLS player with access control
+(public / private / unlisted) and token-based authentication.
 
-Интерфейс стилизован под ретро-игры (пиксельный 8-bit UI) с поддержкой тёмной и
-светлой темы.
+UI is styled as a retro 8-bit pixel art interface with support for three themes:
+**light**, **soft** (muted dark with lower contrast), and **dark**.
 
-## Стек
+## Tech Stack
 
-| Слой | Технология |
+| Layer | Technology |
 | --- | --- |
-| UI | React 19, TypeScript |
-| Сборка | Vite 7, Tailwind CSS 4, pnpm |
-| Состояние | Redux Toolkit, RTK Query, Zustand |
-| Роутинг | React Router v7 |
-| Видео | HLS.js (воспроизведение) |
-| Компоненты | shadcn/ui (New York) + кастомные 8-bit |
-| Иконки | pixelarticons, lucide-react |
+| UI | React 19, TypeScript (strict) |
+| Build | Vite 7, Tailwind CSS 4 (CSS-first config), pnpm |
+| State | Redux Toolkit, RTK Query, Zustand |
+| Routing | React Router v7 (browser router) |
+| Video | HLS.js (playback), custom HLS player |
+| Components | shadcn/ui (New York) + custom 8-bit pixel art components |
+| Icons | pixelarticons, lucide-react |
+| Fonts | Press Start 2P (self-hosted via @fontsource) |
+| Toasts | Sonner (8-bit styled) |
+| Upload | react-dropzone, multipart/chunked upload |
 
-## Возможности
+## Features
 
-- Аутентификация: регистрация, вход, выход; access + refresh токены
-  (cookie для refresh, автоматическое обновление при 401);
-- Загрузка видео двумя способами:
-  - прямая (`multipart/form-data`) для файлов до 5 МБ;
-  - многопоточная multipart-загрузка (чанки 5 МБ, 3 параллельных куска) с
-    прогресс-баром для больших файлов;
-- Жизненный цикл стрима: `draft → processing → ready → published`, а также `error`;
-- Видимость стрима: `public`, `private`, `unlisted`;
-- Публикация / снятие с публикации;
-- Просмотр через HLS-плеер с авторизацией (Bearer token) и защитой от кэша;
-- Реальные обновления состояния стрима через WebSocket;
-- Публичный каталог с бесконечной подгрузкой (IntersectionObserver);
-- Личный кабинет: "My Videos", редактирование и удаление стримов.
+- **Authentication:** register, login, logout; access + refresh tokens
+  (cookie-based refresh, automatic reauth on 401);
+- **Video upload** — two modes:
+  - Direct upload (`multipart/form-data`) for files up to 5 MB;
+  - Multipart chunked upload (5 MB chunks, 3 parallel) with progress bar
+    for larger files;
+- **Batch upload:** tab-based Single/Batch mode, multi-file dropzone
+  (up to 20 files), upload queue with per-file progress, 2-concurrency
+  parallel upload, retry failed files, completion countdown with redirect;
+- **Stream lifecycle:** `draft → processing → ready → published`, `error`;
+- **Stream visibility:** `public`, `private`, `unlisted`;
+- **Publish / unpublish** streams;
+- **HLS player** with:
+  - Bearer token authorization on playlist/segment requests;
+  - Anti-cache `?t=` parameter;
+  - 403 "Access denied" handling;
+  - Second HLS instance for blurred video background;
+  - Custom control panel (play/pause, seek, volume, mute);
+  - Wide mode (fills browser width) and fullscreen;
+  - Keyboard shortcuts (Space/F/W/Arrows/H/Escape) with help overlay;
+  - Touch controls on mobile (auto-hide after 3s);
+  - Flash overlays for volume/seek changes;
+- **Three themes:** light / soft (muted dark) / dark — cyclic toggle
+  (Sun → Star → Moon icons);
+- **Real-time updates** via WebSocket (`STREAM_UPDATED`, `STREAM_READY`
+  events invalidate RTK Query tags);
+- **Public catalog** with infinite scroll (IntersectionObserver);
+- **My Streams** page with table/grid toggle, default table view,
+  client-side sorting by Title/Status/Created;
+- **Edit page** with HLS player preview for ready/published streams;
+- **Mobile responsive:** hamburger nav, hidden columns on small screens;
+- **Toast notifications** (Sonner, styled as 8-bit pixel toasts);
+- **Stream cards** with square thumbnails and duration badge;
+- **Marquee title** for long titles that overflow their container.
 
-## Команды
+## Commands
 
 ```bash
-pnpm dev          # dev-сервер (Vite, HMR) на localhost:5173
-pnpm build        # проверка типов (tsc -b) + production-сборка в dist/
+pnpm dev          # dev server (Vite, HMR) on localhost:5173
+pnpm build        # type-check (tsc -b) + production build to dist/
 pnpm lint         # ESLint (flat config)
-pnpm preview      # локальный предпросмотр production-сборки
+pnpm preview      # preview production build locally
 ```
 
 Docker / K8s:
 
 ```bash
-pnpm docker:build   # собрать образ web-frontend
-pnpm docker:run     # запустить контейнер на порту 3000 (nginx)
+pnpm docker:build   # build Docker image (web-frontend)
+pnpm docker:run     # run container on port 3000 (nginx)
+pnpm docker:push    # tag + push to Docker Hub (xomrkob/web-frontend:latest)
 pnpm k8s:apply      # kubectl apply -f k8s/
 pnpm k8s:deploy     # build → push → rollout restart deployment
 ```
 
-## Структура проекта
+## Project Structure
 
 ```
 src/
-├── main.tsx                # точка входа, Provider + Redux store
-├── App.tsx                 # роутер (createBrowserRouter)
-├── pages/                  # страницы (Home, Streams, CreateStream, ...)
-├── layouts/
-│   └── MainLayout.tsx      # шапка, навигация, auth-модалки, футер
+├── main.tsx                    # entry point, Provider + Redux store
+├── App.tsx                     # router, ThemeProvider, Toaster
+├── hooks.ts                    # typed Redux hooks
+├── index.css                   # Tailwind + theme CSS (light/dark/soft)
+├── assets/
+│   └── react.svg
 ├── components/
-│   ├── hls-player.tsx      # воспроизведение HLS с авторизацией
-│   ├── stream-card.tsx     # карточка стрима + статусы
-│   ├── video-dropzone.tsx  # drag & drop загрузка файла
-│   ├── protected-route.tsx # гвардия приватных маршрутов
-│   └── ui/                 # shadcn/ui + 8-bit (button, dropdown, progress)
+│   ├── hls-player.tsx          # custom HLS player (wide/fullscreen/touch/blur)
+│   ├── marquee-title.tsx       # auto-scrolling overflow text
+│   ├── mode-toggle.tsx         # cyclic theme toggle (light → soft → dark)
+│   ├── protected-route.tsx     # auth guard
+│   ├── stream-card.tsx         # card with thumbnail + status + duration
+│   ├── stream-sidebar.tsx      # infinite-scroll related streams
+│   ├── theme-context.ts        # ThemeProviderContext + useTheme
+│   ├── theme-provider.tsx      # ThemeProvider with localStorage
+│   ├── transcoder-progress.tsx # transcoder progress (WebSocket-fed)
+│   ├── video-dropzone.tsx      # react-dropzone (single/multi)
+│   └── ui/
+│       ├── button.tsx, button-variants.ts, card.tsx, dialog.tsx
+│       ├── dropdown-menu.tsx, input.tsx, label.tsx
+│       ├── login-form.tsx, register-form.tsx
+│       ├── table.tsx, tooltip.tsx
+│       └── 8bit/
+│           ├── button.tsx      # pixel-art bordered Button
+│           ├── dropdown-menu.tsx
+│           ├── progress-bar.tsx
+│           ├── variants.ts     # CVA variants
+│           └── styles/retro.css
 ├── feature/
-│   ├── auth/               # authSlice (token, authUser, isInitializing)
-│   └── videoProgress/      # прогресс транскодинга по streamId
-├── services/
-│   ├── auth.ts             # RTK Query: login / register / logout
-│   ├── users.ts            # RTK Query: who, списки
-│   └── streams.ts          # RTK Query: CRUD стримов + загрузка (multipart)
-├── store/
-│   ├── store.ts            # configureStore, rootReducer
-│   └── middleware/
-│       ├── socketMiddleware.ts # WebSocket-обновления стримов
-│       └── authListener.ts     # подгрузка профиля после логина
-├── hooks/                  # useAuth, useVideoUrl, useMultipartUpload, ...
-├── types/                  # TS-типы auth / user / stream
+│   ├── auth/authSlice.ts
+│   └── videoProgress/videoProgressSlice.ts
+├── hooks/
+│   ├── useAuth.ts
+│   ├── useMultipartUpload.ts
+│   ├── useVideoProgress.ts
+│   └── useVideoUrl.ts
+├── layouts/MainLayout.tsx
 ├── lib/
-│   └── utils.ts            # cn() (clsx + tailwind-merge)
-└── index.css               # Tailwind и кастомные стили
+│   ├── stream-format.ts        # statusConfig, formatDate, thumbnailUrl
+│   └── utils.ts                # cn(), getErrorMessage()
+├── pages/
+│   ├── CreateStreamPage.tsx    # Single/Batch upload tabs
+│   ├── EditStreamPage.tsx      # edit + HLS preview
+│   ├── MainPage.tsx            # landing page
+│   ├── OwnStreamsPage.tsx       # table/grid, sorting
+│   ├── StreamPage.tsx          # detail + player + owner actions
+│   └── StreamsPage.tsx         # catalog, infinite scroll
+├── services/
+│   ├── auth.ts                 # login, register, logout
+│   ├── streams.ts              # CRUD + upload (single/multipart)
+│   └── users.ts                # whoami, lists (with reauth)
+├── store/
+│   ├── store.ts
+│   └── middleware/
+│       ├── authListener.ts
+│       └── socketMiddleware.ts
+└── types/
+    ├── auth.types.ts
+    ├── stream.types.ts
+    └── user.types.ts
 ```
 
-## Маршруты
+## Routes
 
-| Путь | Страница | Доступ |
+| Path | Page | Access |
 | --- | --- | --- |
-| `/` | MainPage (лендинг) | публичный |
-| `/streams` | Каталог стримов | публичный |
-| `/streams/:id` | Страница стрима + плеер | публичный (доступ по правам владельца) |
-| `/streams/create` | Создание стрима | **только авторизованные** |
-| `/streams/own` | Мои стримы | **только авторизованные** |
-| `/streams/:id/edit` | Редактирование стрима | **только авторизованные** |
+| `/` | MainPage (landing) | public |
+| `/streams` | Stream catalog | public |
+| `/streams/:id` | Stream detail + player | public (access by owner rights) |
+| `/streams/create` | Create stream | **authenticated only** |
+| `/streams/own` | My streams | **authenticated only** |
+| `/streams/:id/edit` | Edit stream | **authenticated only** |
 
-Приватные маршруты обёрнуты в `ProtectedRoute`: при отсутствии токена — редирект
-на `/`.
+Private routes wrapped in `ProtectedRoute`: no token → redirect to `/`.
 
-## Архитектура
+## Architecture
 
-### State management
+### State Management
 
-`store/store.ts` собирает редьюсеры:
-
+`store/store.ts` combines reducers:
 - `authApi`, `userApi`, `streamApi` — RTK Query API slices;
-- `auth` — токен, профиль (authUser), флаг инициализации;
-- `videoProgress` — прогресс транскодинга по `streamId`.
+- `auth` — token, profile, initialization flag;
+- `videoProgress` — transcoding progress by streamId.
 
-Мидлвари: `socketMiddleware` (WebSocket) и `authListener` (загрузка профиля после
-успешного логина).
+Middleware: `socketMiddleware` (WebSocket) and `authListener` (loads profile
+after login).
 
-### RTK Query и reauth
+### RTK Query + Reauth
 
-Все API-запросы используют `fetchBaseQuery` с `credentials: "include"`.
-`baseQueryWithReauth` перехватывает ответ 401, вызывает `POST auth/refresh` и при
-успехе повторяет исходный запрос; иначе очищает авторизацию (`eraseAuth`).
+All requests use `fetchBaseQuery` with `credentials: "include"` and 30s timeout.
+`baseQueryWithReauth` intercepts 401, calls `POST auth/refresh`, retries the
+original request on success; otherwise dispatches `eraseAuth`.
 
-### Загрузка видео
+### Upload Flow
 
-`useMultipartUpload` реализует multipart-загрузку:
+`useMultipartUpload`: `init` → 5 MB chunks × 3 parallel → `complete`.
+Each chunk retries up to 3 times with exponential backoff.
+Files < 5 MB use direct upload.
 
-1. `POST /stream/{id}/upload/init` — получить `upload_id`;
-2. нарезать файл на чанки по 5 МБ, заливать по 3 параллельно
-   (`PUT /stream/{id}/upload/part`) с метаданными `part_number`/`etag`;
-3. `POST /stream/{id}/upload/complete` — собрать части.
-
-Для файлов до 5 МБ используется простая загрузка `POST /stream/{id}/upload`.
+**Batch upload** (`CreateStreamPage`): sequential stream creation, 2-concurrency
+parallel file upload, per-file progress queue, retry failed, completion countdown.
 
 ### WebSocket
 
-`socketMiddleware` открывает соединение `wss://.../stream/ws/updates?token=...`
-при появлении токена. По событиям `STREAM_UPDATED` и `STREAM_READY` инвалидирует
-соответствующие теги RTK Query, вызывая автоматическую перезагрузку данных.
+`socketMiddleware` opens `wss://.../stream/ws/updates?token=...`.
+Events `STREAM_UPDATED` / `STREAM_READY` invalidate RTK Query tags.
+`useVideoProgress` opens a separate WebSocket for transcoding progress.
 
-### Видеоплеер
+### HLS Player
 
-`HLSPlayer` на базе hls.js: нативная поддержка HLS на iOS (Safari) или
-эмулируемая на остальных браузерах. Запросы плейлиста и сегментов шлются с
-заголовком `Authorization: Bearer <token>`. Ошибка 403 показывается
-пользователю как "Access denied". URL дёргается параметром `t` для анти-кэша.
+Custom 547-line player on hls.js:
+- Bearer auth + anti-cache `?t=` on all HLS requests;
+- 403 → "Access denied";
+- Second HLS instance for blurred background;
+- Custom controls: play/pause, seek, volume, mute, wide, fullscreen;
+- Keyboard shortcuts (Space/F/W/Arrows/H/Escape) + help overlay;
+- Touch controls: tap to toggle, auto-hide after 3s;
+- Flash overlays for volume/seek feedback.
 
-## Конфигурация
+### Theme System
 
-Базовые адреса захардкожены:
+Three themes via CSS custom properties:
+- **Light:** white bg, dark text;
+- **Dark:** near-black bg, light text;
+- **Soft:** muted dark (`#343d3f` bg, lower contrast).
 
-- REST API: `https://api.example.com/` (`src/services/*`, `src/hooks/useVideoUrl.ts`);
-- WebSocket: `wss://api.example.com/stream/ws/updates` (`src/store/middleware/socketMiddleware.ts`);
-- HLS-плейлист: `https://api.example.com/stream/{id}/hls/index.m3u8` (`useVideoUrl`).
+`ThemeProvider` persists to `<html>` classes. Soft applies both `.soft` and
+`.dark` so `dark:` Tailwind variants work. `ModeToggle` cycles:
+light → soft → dark → light (Sun / Star / Moon).
 
-Пат-алиас `@/*` → `src/*` настроен в `tsconfig` и `vite.config.ts`.
+## Configuration
 
-## Деплой
+Hardcoded URLs:
+- REST API: `https://api.example.com/`
+- WebSocket: `wss://api.example.com/stream/ws/updates`
+- HLS: `https://api.example.com/stream/{id}/hls/index.m3u8`
+- Thumbnails: `https://storage.example.com/go-app-bucket/thumbnails/{id}.jpg`
 
-**Docker:** multi-stage сборка. Стадия `builder` — Node 20 + pnpm, собирает
-`dist/`. Финальный образ — `nginx:alpine`, отдаёт статику с `nginx.conf`:
+Path alias `@/*` → `src/*` (tsconfig + vite.config.ts).
 
-- SPA-fallback на `index.html`;
-- кэширование статики на 1 год (`immutable`);
-- gzip ответов;
-- healthcheck-эндпоинт `/health`;
-- образ слушает порт 80.
+## Deployment
 
-**K8s:** манифесты в `k8s/`. Скрипт `k8s:deploy` собирает образ, пушит в
-Docker Hub (`xomrkob/web-frontend:latest`) и выполняет `rollout restart` деплоймента
-`web-frontend` в namespace `go-app`.
+**Docker:** multi-stage — Node 20 + pnpm builder → nginx:alpine.
+SPA fallback, 1-year immutable cache on static assets, gzip, `/health` endpoint.
 
-## Примечания по коду
+**K8s:** manifests in `k8s/` (Deployment, Service, Ingress).
+Image `xomrkob/web-frontend:latest`, namespace `go-app`.
+Resources: 50-100m CPU, 64-128Mi memory. Probes on `/health`.
 
-- `useVideoUrl` — заглушка: всегда возвращает `isLoading: null` и `error: null`;
-- в `authSlice` есть дублирующийся обработчик `getAuthUser.matchFulfilled`;
-- отладочные `console.log` в `socketMiddleware` и `hls-player`;
-- в `StreamPage` присутствуют неиспользуемые переменные (например загрузка
-  `Publish`/`Unpublish` состояний).
+## Known Issues
+
+- `useVideoUrl` is a stub — returns `isLoading: null`, `error: null`;
+- `LoginPage` is legacy, not styled with 8-bit theme;
+- `HomePage` is a placeholder;
+- Base URLs are hardcoded (no env var support yet).
+
+## Troubleshooting
+
+### kindnet veth flaking (WSL2 / Docker Desktop)
+
+**Symptom:** pods Running but requests hang (504, 60s+). Login, upload,
+or any DB-backed endpoint stalls.
+
+**Diagnosis:**
+```bash
+kubectl run nettest --image=busybox --rm -it -- nc -z -w 6 postgresql 5432
+```
+
+**Fix:**
+```bash
+kubectl delete pod -n kube-system -l k8s-app=kindnet
+kubectl delete pod -n go-app postgresql-0 casbin-redis-master-0
+```
+
+**Note:** known kindnet issue on WSL2, recurred 4+ times. Data safe (PVC).
+If identity-service enters CrashLoopBackOff after recovery, delete its pod.
+
+## Contributing
+
+### Development Setup
+
+```bash
+pnpm install
+pnpm dev
+```
+
+### Code Style
+
+- TypeScript strict, no unused locals/parameters;
+- ESLint flat config (v9+) with react-hooks + react-refresh;
+- Tailwind CSS 4 (CSS-first, no tailwind.config.ts);
+- shadcn/ui (New York) in `src/components/ui/`,
+  8-bit variants in `src/components/ui/8bit/`;
+- `cn()` utility for class merging (clsx + tailwind-merge);
+- Types in `src/types/` (auth, stream, user);
+- No comments in code (unless requested), no secrets in commits.
+
+## Changelog
+
+- **Batch upload:** Single/Batch tabs, multi-file dropzone, parallel upload,
+  retry, completion countdown;
+- **Soft theme:** muted dark, cyclic Sun/Star/Moon toggle;
+- **Table view:** default table on OwnStreams, grid toggle, sorting,
+  mobile-responsive;
+- **HLS player:** blurred background, wide/fullscreen, keyboard shortcuts,
+  touch controls, flash overlays;
+- **Mobile nav:** hamburger dropdown;
+- **Toasts:** Sonner with 8-bit styling;
+- **Stream cards:** square thumbnails, duration badge;
+- **Edit page:** HLS preview above form;
+- **Self-hosted font:** Press Start 2P via @fontsource;
+- **Hardened uploads:** chunk retry, 30s timeout;
+- **Docker fix:** pnpm-workspace.yaml allowBuilds.
