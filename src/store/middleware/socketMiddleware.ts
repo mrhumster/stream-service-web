@@ -15,9 +15,7 @@ export const socketMiddleware: Middleware<object, PartialRootState> = (store) =>
     const state = store.getState();
     const token = state.auth.token;
     if (token && !socket) {
-      socket = new WebSocket(
-        `${import.meta.env.VITE_WS_URL}?token=${token}`,
-      );
+      socket = new WebSocket(import.meta.env.VITE_WS_URL, [token]);
       socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
