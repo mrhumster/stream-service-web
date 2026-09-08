@@ -30,7 +30,7 @@ spec:
       containers:
         - name: web-frontend
           image: xomrkob/web-frontend:latest
-          imagePullPolicy:
+          imagePullPolicy: Always
           resources:
             requests:
               cpu: 50m

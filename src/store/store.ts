@@ -1,6 +1,5 @@
 import { combineReducers, configureStore } from "@reduxjs/toolkit";
 import { authSlice } from "../feature/auth/authSlice";
-import { videoProgressSlice } from "../feature/videoProgress/videoProgressSlice";
 import { settingsReducer } from "../feature/settings/settingsSlice";
 import { authApi } from "../services/auth";
 import { userApi } from "../services/users";
@@ -13,7 +12,6 @@ const rootReducer = combineReducers({
   [userApi.reducerPath]: userApi.reducer,
   [streamApi.reducerPath]: streamApi.reducer,
   auth: authSlice.reducer,
-  videoProgress: videoProgressSlice.reducer,
   settings: settingsReducer,
 });
 
