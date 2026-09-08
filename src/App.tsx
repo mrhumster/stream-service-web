@@ -1,6 +1,5 @@
 import { MainLayout } from "./layouts/MainLayout";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
-import { MainPage } from "./pages/MainPage";
 import { StreamsPage } from "./pages/StreamsPage";
 import { CreateStreamPage } from "./pages/CreateStreamPage";
 import { EditStreamPage } from "./pages/EditStreamPage";
@@ -15,7 +14,7 @@ const router = createBrowserRouter([
   {
     element: <MainLayout />,
     children: [
-      { path: "/", element: <MainPage /> },
+      { path: "/", element: <StreamsPage /> },
       { path: "/streams", element: <StreamsPage /> },
       {
         element: <ProtectedRoute />,
