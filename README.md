@@ -97,7 +97,6 @@ src/
 │   ├── stream-sidebar.tsx      # infinite-scroll related streams
 │   ├── theme-context.ts        # ThemeProviderContext + useTheme
 │   ├── theme-provider.tsx      # ThemeProvider with localStorage
-│   ├── transcoder-progress.tsx # transcoder progress (WebSocket-fed)
 │   ├── video-dropzone.tsx      # react-dropzone (single/multi)
 │   └── ui/
 │       ├── button.tsx, button-variants.ts, card.tsx, dialog.tsx
@@ -111,12 +110,10 @@ src/
 │           ├── variants.ts     # CVA variants
 │           └── styles/retro.css
 ├── feature/
-│   ├── auth/authSlice.ts
-│   └── videoProgress/videoProgressSlice.ts
+│   └── auth/authSlice.ts
 ├── hooks/
 │   ├── useAuth.ts
 │   ├── useMultipartUpload.ts
-│   ├── useVideoProgress.ts
 │   └── useVideoUrl.ts
 ├── layouts/MainLayout.tsx
 ├── lib/
@@ -163,8 +160,7 @@ Private routes wrapped in `ProtectedRoute`: no token → redirect to `/`.
 
 `store/store.ts` combines reducers:
 - `authApi`, `userApi`, `streamApi` — RTK Query API slices;
-- `auth` — token, profile, initialization flag;
-- `videoProgress` — transcoding progress by streamId.
+- `auth` — token, profile, initialization flag.
 
 Middleware: `socketMiddleware` (WebSocket) and `authListener` (loads profile
 after login).
@@ -186,9 +182,9 @@ parallel file upload, per-file progress queue, retry failed, completion countdow
 
 ### WebSocket
 
-`socketMiddleware` opens `wss://.../stream/ws/updates?token=...`.
-Events `STREAM_UPDATED` / `STREAM_READY` invalidate RTK Query tags.
-`useVideoProgress` opens a separate WebSocket for transcoding progress.
+`socketMiddleware` opens `wss://.../stream/ws/updates` with the access token passed via the
+**`Sec-WebSocket-Protocol` subprotocol** (required by the backend; the server echoes it during
+the handshake). Events `STREAM_UPDATED` / `STREAM_READY` invalidate RTK Query tags.
 
 ### HLS Player
 
@@ -220,7 +216,7 @@ Defaults are set in `.env` (local dev) and `Dockerfile` ARGs (Docker/K8s builds)
 | Variable | Default | Used in |
 | --- | --- | --- |
 | `VITE_API_URL` | `https://api.example.com` | auth.ts, users.ts, streams.ts |
-| `VITE_WS_URL` | `wss://api.example.com/stream/ws/updates` | socketMiddleware.ts, useVideoProgress.ts |
+| `VITE_WS_URL` | `wss://api.example.com/stream/ws/updates` | socketMiddleware.ts |
 | `VITE_HLS_URL` | `https://api.example.com` | useVideoUrl.ts |
 | `VITE_STORAGE_URL` | `https://storage.example.com/go-app-bucket/thumbnails` | stream-format.ts (thumbnails) |
 
@@ -264,8 +260,9 @@ kubectl delete pod -n kube-system -l k8s-app=kindnet
 kubectl delete pod -n go-app postgresql-0 casbin-redis-master-0
 ```
 
-**Note:** known kindnet issue on WSL2, recurred 4+ times. Data safe (PVC).
-If identity-service enters CrashLoopBackOff after recovery, delete its pod.
+**Note:** known kindnet issue on WSL2, recurred many times — now auto-healed by the
+`kindnet-recovery` DaemonSet in `go-app` (restarts the CNI + postgres/redis pods on failure).
+Data safe (PVC). If identity-service enters CrashLoopBackOff after recovery, delete its pod.
 
 ## Contributing
 
@@ -289,6 +286,10 @@ pnpm dev
 
 ## Changelog
 
+- **WS subprotocol auth:** token moved from `?token=` to `Sec-WebSocket-Protocol`
+  (matches backend `WSProtocolAuth`, fixes handshake with gorilla/websocket);
+- **Dead code removed:** `useVideoProgress`, `videoProgress` slice,
+  `transcoder-progress.tsx` (backend only sends `STREAM_UPDATED`/`STREAM_READY`);
 - **Batch upload:** Single/Batch tabs, multi-file dropzone, parallel upload,
   retry, completion countdown;
 - **Soft theme:** muted dark, cyclic Sun/Star/Moon toggle;
