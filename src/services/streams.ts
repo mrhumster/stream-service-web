@@ -235,6 +235,16 @@ export const streamApi = createApi({
         body,
       }),
     }),
+    reprocessStream: builder.mutation<void, { id: string }>({
+      query: ({ id }) => ({
+        url: `stream/${id}/reprocess`,
+        method: "POST",
+      }),
+      invalidatesTags: (_res, _err, { id }) => [
+        { type: "Stream" as const, id },
+        { type: "Stream" as const, id: "LIST" },
+      ],
+    }),
   }),
 });
 
@@ -252,4 +262,5 @@ export const {
   useListOwnStreamsQuery,
   usePublishStreamMutation,
   useUnpublishStreamMutation,
+  useReprocessStreamMutation,
 } = streamApi;

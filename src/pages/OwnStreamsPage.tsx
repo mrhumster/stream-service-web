@@ -26,6 +26,26 @@ import type { StreamResponse } from "@/types/stream.types";
 type ViewMode = "grid" | "table";
 type SortField = "created_at" | "title" | "status";
 
+function ThumbCell({ stream }: { stream: StreamResponse }) {
+  const [broken, setBroken] = useState(false);
+  if (!hasThumbnail(stream.status) || broken) {
+    return (
+      <div className="w-10 h-10 bg-muted border-2 border-foreground/10 flex items-center justify-center">
+        <Image className="size-4 text-muted-foreground/60" />
+      </div>
+    );
+  }
+  return (
+    <img
+      src={thumbnailUrl(stream.id)}
+      alt=""
+      className="w-10 h-10 object-cover border-2 border-foreground/10"
+      loading="lazy"
+      onError={() => setBroken(true)}
+    />
+  );
+}
+
 function compareStreams(a: StreamResponse, b: StreamResponse, field: SortField): number {
   switch (field) {
     case "created_at":
@@ -212,18 +232,7 @@ export const OwnStreamsPage = () => {
                 >
                   {/* Thumbnail */}
                   <TableCell className="p-1.5 hidden sm:table-cell">
-                    {hasThumbnail(stream.status) ? (
-                      <img
-                        src={thumbnailUrl(stream.id)}
-                        alt=""
-                        className="w-10 h-10 object-cover border-2 border-foreground/10"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 bg-muted border-2 border-foreground/10 flex items-center justify-center">
-                        <Image className="size-4 text-muted-foreground/60" />
-                      </div>
-                    )}
+                    <ThumbCell stream={stream} />
                   </TableCell>
 
                   {/* Title */}

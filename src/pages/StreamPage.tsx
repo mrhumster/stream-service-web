@@ -17,6 +17,7 @@ import {
   useDeleteStreamMutation,
   usePublishStreamMutation,
   useUnpublishStreamMutation,
+  useReprocessStreamMutation,
 } from "@/services/streams";
 import { useVideoUrl } from "@/hooks/useVideoUrl";
 import {
@@ -26,7 +27,7 @@ import {
 } from "@/lib/stream-format";
 import { useAppSelector } from "@/hooks";
 import { cn, getErrorMessage } from "@/lib/utils";
-import { ArrowLeft, Lock, PenSquare, Delete, Globe } from "pixelarticons/react";
+import { ArrowLeft, Lock, PenSquare, Delete, Globe, Reload } from "pixelarticons/react";
 import { HLSPlayer } from "@/components/hls-player";
 import ProgressBar from "@/components/ui/8bit/progress-bar";
 import { useAuth } from "@/hooks/useAuth";
@@ -50,6 +51,8 @@ export const StreamPage = () => {
     usePublishStreamMutation();
   const [unpublishStream, { isLoading: isUnpublished }] =
     useUnpublishStreamMutation();
+  const [reprocessStream, { isLoading: isReprocessing }] =
+    useReprocessStreamMutation();
   const [confirmAction, setConfirmAction] = useState<
     "publish" | "unpublish" | "delete" | null
   >(null);
@@ -64,6 +67,7 @@ export const StreamPage = () => {
   const isReady = stream && stream.status == "ready";
   const isPublish = stream && stream.status == "published";
   const isOwner = authUser && stream && authUser.id === stream.owner_id;
+  const isAdmin = authUser?.role === "admin";
   const isProfileLoading = token && !authUser;
 
   if (isLoading || isInitializing || isProfileLoading) {
@@ -113,6 +117,23 @@ export const StreamPage = () => {
 
   const status = statusConfig[stream.status] ?? defaultStatus;
 
+  const transcodeTask =
+    stream.processing.find((t) => t.task_type === "transcode") ??
+    stream.processing[0];
+  const processingError =
+    stream.processing.find((t) => t.error)?.error ?? null;
+  const overallProgress = transcodeTask?.progress ?? 0;
+  const processingSteps = transcodeTask?.steps ?? [];
+
+  const handleReprocess = async () => {
+    try {
+      await reprocessStream({ id: stream!.id }).unwrap();
+      toast.success("Processing restarted");
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto">
       <Link
@@ -133,19 +154,45 @@ export const StreamPage = () => {
           {/* Video Player */}
           {!isReady && !isPublish ? (
             <div className="flex flex-col items-center gap-4 py-20">
-              <Lock className="size-10 text-muted-foreground" />
-              <p className="text-sm text-center uppercase tracking-wider text-muted-foreground">
-                The video is not ready for playback yet. Please wait.
-              </p>
-              <Link
-                to="/streams"
-                className="inline-flex items-center gap-2 text-xs uppercase text-muted-foreground hover:text-foreground"
-              >
-                <ArrowLeft className="size-4" />
-                Back to Streams
-              </Link>
-              <ProgressBar progress={stream.processing.progress} />
-              <p className="uppercase text-zinc-500">{stream.processing.steps}</p>
+              {stream.status === "error" ? (
+                <>
+                  <p className="text-sm uppercase tracking-wider text-destructive">
+                    Processing failed
+                  </p>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground max-w-md text-center">
+                    {processingError || "Unknown error during processing"}
+                  </p>
+                  {(isOwner || isAdmin) && (
+                    <button
+                      onClick={handleReprocess}
+                      disabled={isReprocessing}
+                      aria-label={isReprocessing ? "Reprocessing..." : "Reprocess"}
+                      className="cursor-pointer inline-flex items-center justify-center min-w-9 gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-3 sm:px-4 font-bold disabled:opacity-50"
+                    >
+                      <Reload className="size-5" />
+                      <span className="hidden md:inline">
+                        {isReprocessing ? "Reprocessing..." : "Reprocess"}
+                      </span>
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Lock className="size-10 text-muted-foreground" />
+                  <p className="text-sm text-center uppercase tracking-wider text-muted-foreground">
+                    The video is not ready for playback yet. Please wait.
+                  </p>
+                  <Link
+                    to="/streams"
+                    className="inline-flex items-center gap-2 text-xs uppercase text-muted-foreground hover:text-foreground"
+                  >
+                    <ArrowLeft className="size-4" />
+                    Back to Streams
+                  </Link>
+                  <ProgressBar progress={overallProgress} />
+                  <p className="uppercase text-zinc-500">{processingSteps}</p>
+                </>
+              )}
             </div>
           ) : (
             <Card className="rounded-none border-4 border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,0.3)] mb-6 overflow-hidden">

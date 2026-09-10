@@ -34,11 +34,12 @@ export interface StreamStorage {
   filename: string;
 }
 
-export interface StreamProcessing {
+export interface StreamProcessingTask {
+  task_type: "transcode" | "thumbnail";
   progress: number;
   steps: string[];
   error: string | null;
-  task_id: string;
+  task_id: string | null;
 }
 
 export interface StreamAnalytics {
@@ -59,7 +60,7 @@ export interface StreamResponse {
   created_at: string;
   updated_at: string;
   published_at: string | null;
-  processing: StreamProcessing;
+  processing: StreamProcessingTask[];
 }
 
 export interface StreamListParams {
