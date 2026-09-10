@@ -33,7 +33,10 @@ UI is styled as a retro 8-bit pixel art interface with support for three themes:
 - **Batch upload:** tab-based Single/Batch mode, multi-file dropzone
   (up to 20 files), upload queue with per-file progress, 2-concurrency
   parallel upload, retry failed files, completion countdown with redirect;
-- **Stream lifecycle:** `draft → processing → ready → published`, `error`;
+- **Stream lifecycle:** `draft → processing → ready → published`, `error`; failed
+  transcode shows an error panel with a **Reprocess** button (owner/admin), which
+  re-enqueues the processing tasks (tracked per-task in a `processing` array:
+  `transcode` + `thumbnail`);
 - **Stream visibility:** `public`, `private`, `unlisted`;
 - **Publish / unpublish** streams;
 - **HLS player** with:
