@@ -33,6 +33,12 @@ import ProgressBar from "@/components/ui/8bit/progress-bar";
 import { useAuth } from "@/hooks/useAuth";
 import { MarqueeTitle } from "@/components/marquee-title";
 import { StreamSidebar } from "@/components/stream-sidebar";
+import type { StreamProcessingTask } from "@/types/stream.types";
+
+const taskLabels: Record<StreamProcessingTask["task_type"], string> = {
+  transcode: "Transcoding",
+  thumbnail: "Thumbnail",
+};
 
 export const StreamPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -117,13 +123,8 @@ export const StreamPage = () => {
 
   const status = statusConfig[stream.status] ?? defaultStatus;
 
-  const transcodeTask =
-    stream.processing.find((t) => t.task_type === "transcode") ??
-    stream.processing[0];
   const processingError =
     stream.processing.find((t) => t.error)?.error ?? null;
-  const overallProgress = transcodeTask?.progress ?? 0;
-  const processingSteps = transcodeTask?.steps ?? [];
 
   const handleReprocess = async () => {
     try {
@@ -189,8 +190,39 @@ export const StreamPage = () => {
                     <ArrowLeft className="size-4" />
                     Back to Streams
                   </Link>
-                  <ProgressBar progress={overallProgress} />
-                  <p className="uppercase text-zinc-500">{processingSteps}</p>
+                  {stream.processing.length === 0 ? (
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground animate-pulse">
+                      Preparing tasks...
+                    </p>
+                  ) : (
+                    <div className="w-full max-w-md flex flex-col gap-4">
+                      {stream.processing.map((task) => (
+                        <div
+                          key={task.task_type}
+                          className="flex flex-col gap-1"
+                        >
+                          <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-muted-foreground">
+                            <span className="font-bold">
+                              {taskLabels[task.task_type]}
+                            </span>
+                            <span>{task.progress}%</span>
+                          </div>
+                          <ProgressBar progress={task.progress} />
+                          {task.error ? (
+                            <p className="text-xs uppercase text-destructive">
+                              {task.error}
+                            </p>
+                          ) : (
+                            task.steps.length > 0 && (
+                              <p className="text-[10px] uppercase tracking-wider text-zinc-500">
+                                {task.steps.join(" → ")}
+                              </p>
+                            )
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </>
               )}
             </div>
