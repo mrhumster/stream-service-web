@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label"
 import { useState, type SyntheticEvent } from "react"
 import { type FetchBaseQueryError } from "@reduxjs/toolkit/query/react"
 import { useRegisterMutation } from "../../services/auth"
+import { toast } from "sonner"
 
 interface RegisterFormProps {
   onSuccess?: () => void
@@ -38,6 +39,7 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
 
     try {
       await register({ email, password }).unwrap()
+      toast.success("Verification email sent — check your inbox")
       onSuccess?.()
     } catch (err) {
       const fetchErr = err as FetchBaseQueryError
