@@ -20,11 +20,14 @@ pnpm lint         # ESLint
 pnpm preview      # Preview production build locally
 ```
 
-Docker/K8s:
+Docker/K8s (k3s в WSL, без Docker Desktop):
 ```bash
-pnpm docker:build   # Build Docker image (stream-web)
-pnpm docker:run     # Run container on port 3000
-pnpm k8s:deploy     # Build, push, restart K8s deployment
+docker build ...       # Docker Engine в WSL (docker-ce)
+docker push xomrkob/...  # или npm run build в кластер
+
+kubectl                # симлинк на k3s, KUBECONFIG=~/.kube/config
+make all               # весь стек: infra → db-migrate → apps → prometheus → grafana
+make import-images     # docker save ... | k3s ctr images import -
 ```
 
 ## Architecture

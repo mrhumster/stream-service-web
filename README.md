@@ -247,25 +247,21 @@ Resources: 50-100m CPU, 64-128Mi memory. Probes on `/health`.
 
 ## Troubleshooting
 
-### kindnet veth flaking (WSL2 / Docker Desktop)
+### Cluster networking (k3s, since 2026-09-11)
 
-**Symptom:** pods Running but requests hang (504, 60s+). Login, upload,
-or any DB-backed endpoint stalls.
+The cluster was **migrated from Docker Desktop/K8s (kindnet) to k3s** — the recurring
+kindnet pod→pod TCP flakiness (DNS OK / TCP FAIL) no longer applies.
 
-**Diagnosis:**
+If an endpoint hangs on a fresh k3s:
 ```bash
 kubectl run nettest --image=busybox --rm -it -- nc -z -w 6 postgresql 5432
+kubectl get pods -n go-app              # check CrashLoopBackOff / CreateContainerConfigError
+kubectl get ingress -n go-app           # traefik picks up all ingress (default class)
 ```
 
-**Fix:**
-```bash
-kubectl delete pod -n kube-system -l k8s-app=kindnet
-kubectl delete pod -n go-app postgresql-0 casbin-redis-master-0
-```
-
-**Note:** known kindnet issue on WSL2, recurred many times — now auto-healed by the
-`kindnet-recovery` DaemonSet in `go-app` (restarts the CNI + postgres/redis pods on failure).
-Data safe (PVC). If identity-service enters CrashLoopBackOff after recovery, delete its pod.
+**Note (k3s):** pod→pod TCP is flannel, stable. From inside WSL, curl to the public domains via
+the traefik LB may time out (WSL networking) — use `--resolve <domain>:443:<traefik-LB-IP>` or
+test from the Windows side (hosts entry).
 
 ## Contributing
 
