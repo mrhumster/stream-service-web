@@ -4,6 +4,7 @@ import { StreamsPage } from "./pages/StreamsPage";
 import { CreateStreamPage } from "./pages/CreateStreamPage";
 import { EditStreamPage } from "./pages/EditStreamPage";
 import { StreamPage } from "./pages/StreamPage";
+import { VerifyPage } from "./pages/VerifyPage";
 import { ProtectedRoute } from "./components/protected-route";
 import { ThemeProvider } from "@/components/theme-provider";
 import { OwnStreamsPage } from "./pages/OwnStreamsPage";
@@ -16,6 +17,7 @@ const router = createBrowserRouter([
     children: [
       { path: "/", element: <StreamsPage /> },
       { path: "/streams", element: <StreamsPage /> },
+      { path: "/verify", element: <VerifyPage /> },
       {
         element: <ProtectedRoute />,
         children: [

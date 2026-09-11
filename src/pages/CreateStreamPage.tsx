@@ -15,6 +15,8 @@ import { X, Check, AlertTriangle, Film, ExternalLink } from "lucide-react";
 import type { StreamVisibility } from "@/types/stream.types";
 import { useMultipartUpload } from "@/hooks/useMultipartUpload";
 import ProgressBar from "@/components/ui/8bit/progress-bar";
+import { EmailVerificationGate } from "@/components/email-verification";
+import { useAppSelector } from "@/hooks";
 
 const inputClassName =
   "border-4 border-black rounded-none focus-visible:ring-0 focus-visible:border-primary";
@@ -57,6 +59,7 @@ function formatFileSize(bytes: number): string {
 
 export const CreateStreamPage = () => {
   const navigate = useNavigate();
+  const authUser = useAppSelector((s) => s.auth.authUser);
   const [createStream] = useCreateStreamMutation();
   const [uploadVideo] = useUploadVideoMutation();
   const { processUpload } = useMultipartUpload();
@@ -300,6 +303,10 @@ export const CreateStreamPage = () => {
 
   return (
     <div className="max-w-2xl mx-auto">
+      {authUser && authUser.role !== "admin" && authUser.email_verified === false ? (
+        <EmailVerificationGate />
+      ) : (
+      <>
       <h2 className="text-2xl font-bold uppercase tracking-tighter mb-6">
         New Stream
       </h2>
@@ -692,6 +699,8 @@ export const CreateStreamPage = () => {
           )}
         </CardContent>
       </Card>
+      </>
+      )}
     </div>
   );
 };

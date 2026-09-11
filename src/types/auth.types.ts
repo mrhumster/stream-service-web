@@ -14,6 +14,14 @@ export interface RegisterRequest {
   password: string;
 }
 
+export interface VerifyRequest {
+  token: string;
+}
+
+export interface VerifyResponse {
+  verified: boolean;
+}
+
 export interface Success {
   message: string;
   generated_at: string;

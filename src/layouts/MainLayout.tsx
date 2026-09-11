@@ -1,5 +1,5 @@
 import { Link, Outlet } from "react-router-dom";
-import { Menu, Sun, Star, Moon, Monitor, ChevronDown } from "lucide-react";
+import { Menu, Sun, Star, Moon, Monitor, ChevronDown, ShieldAlert } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,7 @@ import { useState } from "react";
 import { useGetAuthUserQuery } from "@/services/users";
 import { useLogoutMutation } from "@/services/auth";
 import { useAppDispatch, useAppSelector } from "@/hooks";
+import { EmailVerificationBanner } from "@/components/email-verification";
 import { setAutoplay, setTheme } from "@/feature/settings/settingsSlice";
 import { useTheme, type Theme } from "@/components/theme-context";
 
@@ -96,6 +97,15 @@ export const MainLayout = () => {
                               Email
                             </span>
                             <p className="text-sm mt-1">{data?.email}</p>
+                            {data && data.email_verified === false && data.role !== "admin" && (
+                              <Link
+                                to="/verify"
+                                className="inline-flex items-center gap-1 mt-1 text-[10px] uppercase font-bold text-yellow-600 hover:underline"
+                              >
+                                <ShieldAlert className="size-3" />
+                                Unverified — verify email
+                              </Link>
+                            )}
                           </div>
                           <div className="flex gap-6 text-[10px] uppercase text-muted-foreground border-t-2 border-foreground/10 pt-3">
                             <div>
@@ -275,6 +285,8 @@ export const MainLayout = () => {
           </nav>
         </div>
       </header>
+
+      <EmailVerificationBanner />
 
       {/* Контент страницы */}
       <main className="flex-1 container mx-auto p-6">
