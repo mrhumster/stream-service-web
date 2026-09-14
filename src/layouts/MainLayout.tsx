@@ -1,5 +1,5 @@
 import { Link, Outlet } from "react-router-dom";
-import { Menu, Sun, Star, Moon, Monitor, ChevronDown, ShieldAlert } from "lucide-react";
+import { Menu, Sun, Star, Moon, Monitor, ChevronDown, ShieldAlert, Activity as ActivityIcon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -73,6 +73,15 @@ export const MainLayout = () => {
                       className="uppercase font-bold hover:text-primary hover:underline underline-offset-4 decoration-4 transition-colors"
                     >
                       My Videos
+                    </Link>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <Link
+                      to="/activity"
+                      className="inline-flex items-center gap-1.5 uppercase font-bold hover:text-primary hover:underline underline-offset-4 decoration-4 transition-colors"
+                    >
+                      <ActivityIcon className="size-3.5" />
+                      Activity
                     </Link>
                   </li>
                   <li className="flex items-center gap-3">
@@ -263,6 +272,11 @@ export const MainLayout = () => {
                   {auth.isAuth && (
                     <DropdownMenuItem asChild>
                       <Link to="/streams/own">My Videos</Link>
+                    </DropdownMenuItem>
+                  )}
+                  {auth.isAuth && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/activity">Activity</Link>
                     </DropdownMenuItem>
                   )}
                   {auth.isAuth ? (

@@ -222,6 +222,7 @@ Defaults are set in `.env` (local dev) and `Dockerfile` ARGs (Docker/K8s builds)
 | `VITE_WS_URL` | `wss://api.example.com/stream/ws/updates` | socketMiddleware.ts |
 | `VITE_HLS_URL` | `https://api.example.com` | useVideoUrl.ts |
 | `VITE_STORAGE_URL` | `https://storage.example.com/go-app-bucket/thumbnails` | stream-format.ts (thumbnails) |
+| `VITE_EVENTS_URL` | `https://events.example.com` | events.ts (activity feed) |
 
 To override for Docker builds:
 
