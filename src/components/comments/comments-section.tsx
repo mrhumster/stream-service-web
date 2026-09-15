@@ -34,11 +34,18 @@ const ghostBtn =
 const textAreaCls =
   "w-full rounded-none border-4 border-foreground/20 bg-background p-2 text-xs leading-relaxed outline-none focus:border-primary resize-y min-h-20";
 
-export function CommentsSection({ streamId }: { streamId: string }) {
+export function CommentsSection({
+  streamId,
+  allowComments = true,
+}: {
+  streamId: string;
+  allowComments?: boolean;
+}) {
   const { isAuth } = useAuth();
   const authUser = useAppSelector((state) => state.auth.authUser);
   const canComment =
     isAuth && !!authUser && (authUser.role === "admin" || authUser.email_verified);
+  const writeable = allowComments && canComment;
 
   const { data: firstPage, isFetching } = useListCommentsQuery({
     streamId,
@@ -119,7 +126,11 @@ export function CommentsSection({ streamId }: { streamId: string }) {
         )}
       </div>
       <CardContent className="flex flex-col gap-6 pt-4">
-        {!isAuth ? (
+        {!allowComments ? (
+          <p className="text-xs uppercase tracking-wider text-muted-foreground">
+            Comments are only available on published streams.
+          </p>
+        ) : !isAuth ? (
           <p className="text-xs uppercase tracking-wider text-muted-foreground">
             Please sign in to leave a comment.
           </p>
@@ -177,7 +188,7 @@ export function CommentsSection({ streamId }: { streamId: string }) {
                 key={comment.id}
                 comment={comment}
                 streamId={streamId}
-                canComment={canComment}
+                canComment={writeable}
               />
             ))}
           </ul>

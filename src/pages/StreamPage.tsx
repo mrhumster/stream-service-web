@@ -431,7 +431,10 @@ export const StreamPage = () => {
             </CardFooter>
           </Card>
 
-          <CommentsSection streamId={id!} />
+          <CommentsSection
+            streamId={id!}
+            allowComments={stream.status === "published" && stream.visibility !== "private"}
+          />
         </div>
 
         {/* Right column: sidebar */}
