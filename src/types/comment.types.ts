@@ -2,6 +2,7 @@ export interface Comment {
   id: string;
   stream_id: string;
   user_id: string;
+  user_email?: string;
   parent_id?: string | null;
   body: string;
   edited_at?: string | null;

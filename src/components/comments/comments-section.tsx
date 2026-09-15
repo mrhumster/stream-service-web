@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   useListCommentsQuery,
   useListRepliesQuery,
@@ -107,17 +107,17 @@ export function CommentsSection({ streamId }: { streamId: string }) {
 
   return (
     <Card className="rounded-none border-4 border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,0.3)] mt-6">
-      <CardHeader className="border-b-2 border-foreground/10 bg-muted/30 flex-row items-center gap-2">
-        <MessageSquare className="size-4" />
-        <CardTitle className="text-sm uppercase tracking-tight">
+      <div className="border-b-2 border-foreground/10 bg-muted/30 flex items-center gap-2 px-6 pb-6">
+        <MessageSquare className="size-4 shrink-0" />
+        <span className="text-sm font-semibold uppercase tracking-tight">
           Comments
-        </CardTitle>
+        </span>
         {!isFetching && (
-          <span className="text-[10px] uppercase text-muted-foreground">
+          <span className="ml-auto text-[10px] uppercase text-muted-foreground">
             {comments.length}
           </span>
         )}
-      </CardHeader>
+      </div>
       <CardContent className="flex flex-col gap-6 pt-4">
         {!isAuth ? (
           <p className="text-xs uppercase tracking-wider text-muted-foreground">
@@ -280,7 +280,7 @@ function CommentItem({
       <div className="border-2 border-foreground/10 p-3">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-2 text-[10px] uppercase tracking-wider text-muted-foreground">
           <span className="font-bold text-foreground">
-            {shortId(comment.user_id)}
+            {comment.user_email ?? shortId(comment.user_id)}
           </span>
           <span>{formatDate(comment.created_at)}</span>
           {comment.edited_at && <span>(edited)</span>}
@@ -486,7 +486,7 @@ function ReplyItem({ reply }: { reply: Comment }) {
     <li className="border-2 border-foreground/10 p-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-2 text-[10px] uppercase tracking-wider text-muted-foreground">
         <span className="font-bold text-foreground">
-          {shortId(reply.user_id)}
+          {reply.user_email ?? shortId(reply.user_id)}
         </span>
         <span>{formatDate(reply.created_at)}</span>
         {reply.edited_at && <span>(edited)</span>}
