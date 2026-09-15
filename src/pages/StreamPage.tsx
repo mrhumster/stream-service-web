@@ -245,6 +245,8 @@ export const StreamPage = () => {
             </Card>
           )}
 
+          <CommentsSection streamId={id!} />
+
           {isOwner && (
             <div className="flex items-center gap-2 mb-6">
               <Link
@@ -437,8 +439,6 @@ export const StreamPage = () => {
           <StreamSidebar excludeId={id!} />
         </aside>
       </div>
-
-      <CommentsSection streamId={id!} />
     </div>
   );
 };

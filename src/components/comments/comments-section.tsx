@@ -106,7 +106,7 @@ export function CommentsSection({ streamId }: { streamId: string }) {
   };
 
   return (
-    <Card className="rounded-none border-4 border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,0.3)] mt-10">
+    <Card className="rounded-none border-4 border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,0.3)] mt-6">
       <CardHeader className="border-b-2 border-foreground/10 bg-muted/30 flex-row items-center gap-2">
         <MessageSquare className="size-4" />
         <CardTitle className="text-sm uppercase tracking-tight">
