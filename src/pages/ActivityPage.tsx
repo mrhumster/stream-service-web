@@ -22,6 +22,8 @@ const EVENT_LABELS: Record<string, { label: string; streamLink: boolean }> = {
   "stream.unpublished": { label: "Stream unpublished", streamLink: true },
   "stream.deleted": { label: "Stream deleted", streamLink: false },
   "stream.reprocessed": { label: "Stream reprocessed", streamLink: true },
+  "comment.created": { label: "You commented", streamLink: true },
+  "comment.replied": { label: "You replied", streamLink: true },
   "user.registered": { label: "Account registered", streamLink: false },
   "user.login": { label: "You signed in", streamLink: false },
   "user.email.verified": { label: "Email verified", streamLink: false },
@@ -106,7 +108,8 @@ export const ActivityPage = () => {
             const meta = eventVisual(entry);
             const isRead = Boolean(entry.read_at);
             const title =
-              (entry.payload?.title as string | undefined) ?? undefined;
+              (entry.payload?.title as string | undefined) ??
+              (entry.payload?.snippet as string | undefined);
             return (
               <li key={entry.id}>
                 <button

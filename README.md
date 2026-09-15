@@ -223,6 +223,7 @@ Defaults are set in `.env` (local dev) and `Dockerfile` ARGs (Docker/K8s builds)
 | `VITE_HLS_URL` | `https://api.example.com` | useVideoUrl.ts |
 | `VITE_STORAGE_URL` | `https://storage.example.com/go-app-bucket/thumbnails` | stream-format.ts (thumbnails) |
 | `VITE_EVENTS_URL` | `https://events.example.com` | events.ts (activity feed) |
+| `VITE_COMMENTS_URL` | `https://comments.example.com` | comments.ts (comments section) |
 
 To override for Docker builds:
 

@@ -34,6 +34,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { MarqueeTitle } from "@/components/marquee-title";
 import { StreamSidebar } from "@/components/stream-sidebar";
 import type { StreamProcessingTask } from "@/types/stream.types";
+import { CommentsSection } from "@/components/comments/comments-section";
 
 const taskLabels: Record<StreamProcessingTask["task_type"], string> = {
   transcode: "Transcoding",
@@ -436,6 +437,8 @@ export const StreamPage = () => {
           <StreamSidebar excludeId={id!} />
         </aside>
       </div>
+
+      <CommentsSection streamId={id!} />
     </div>
   );
 };
