@@ -19,6 +19,11 @@ import {
   RotateCcw,
 } from "lucide-react";
 
+// A view is counted only after the viewer has actually watched at least 80%
+// of the stream (threshold check in onTimeUpdate). This keeps the counter
+// honest for real watchers while still catching most drive-by page loads.
+const VIEW_THRESHOLD = 0.8;
+
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
   const total = Math.floor(seconds);
@@ -433,10 +438,6 @@ export const HLSPlayer = ({
             }}
             onPlay={() => {
               setIsPlaying(true);
-              if (streamId && registeredFor.current !== streamId) {
-                registeredFor.current = streamId;
-                registerView(streamId);
-              }
               bgVideoRef.current?.play().catch(() => undefined);
             }}
             onPause={() => {
@@ -446,9 +447,23 @@ export const HLSPlayer = ({
               }
             }}
             onTimeUpdate={(e) => {
-              setCurrentTime(e.currentTarget.currentTime);
+              const video = e.currentTarget;
+              setCurrentTime(video.currentTime);
               if (bgVideoRef.current) {
-                bgVideoRef.current.currentTime = e.currentTarget.currentTime;
+                bgVideoRef.current.currentTime = video.currentTime;
+              }
+              // A view is counted only after the viewer has actually watched at
+              // least 80% of the stream (VIEW_THRESHOLD). This keeps the counter
+              // honest for real watchers while still catching most drive-bys.
+              if (
+                streamId &&
+                registeredFor.current !== streamId &&
+                Number.isFinite(video.duration) &&
+                video.duration > 0 &&
+                video.currentTime / video.duration >= VIEW_THRESHOLD
+              ) {
+                registeredFor.current = streamId;
+                registerView(streamId);
               }
             }}
             onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
