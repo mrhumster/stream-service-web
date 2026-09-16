@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import { useAuth } from "@/hooks/useAuth";
 import { Lock } from "pixelarticons/react";
+import { useRegisterViewMutation } from "@/services/stats";
+import { ReactionBar } from "@/components/player/reaction-bar";
 import {
   Play,
   Pause,
@@ -41,10 +43,20 @@ function VolumeIcon({
   return <Volume2 className={size} />;
 }
 
-export const HLSPlayer = ({ src, autoplay = true }: { src: string; autoplay?: boolean }) => {
+export const HLSPlayer = ({
+  src,
+  autoplay = true,
+  streamId,
+}: {
+  src: string;
+  autoplay?: boolean;
+  streamId?: string;
+}) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const bgVideoRef = useRef<HTMLVideoElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const registeredFor = useRef<string | null>(null);
+  const [registerView] = useRegisterViewMutation();
   const { isAuth, token, isInitializing } = useAuth();
   const [isForbidden, setIsForbidden] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -236,6 +248,8 @@ export const HLSPlayer = ({ src, autoplay = true }: { src: string; autoplay?: bo
     const bgVideo = bgVideoRef.current;
     if (!video) return;
 
+    registeredFor.current = null;
+
     let hls: Hls | null = null;
     let bgHls: Hls | null = null;
     const antiCacheUrl = src.includes("?")
@@ -419,6 +433,10 @@ export const HLSPlayer = ({ src, autoplay = true }: { src: string; autoplay?: bo
             }}
             onPlay={() => {
               setIsPlaying(true);
+              if (streamId && registeredFor.current !== streamId) {
+                registeredFor.current = streamId;
+                registerView(streamId);
+              }
               bgVideoRef.current?.play().catch(() => undefined);
             }}
             onPause={() => {
@@ -446,6 +464,11 @@ export const HLSPlayer = ({ src, autoplay = true }: { src: string; autoplay?: bo
               ? "opacity-100"
               : "opacity-0 group-hover:opacity-100"
           }`}>
+            {streamId && (
+              <div className="absolute top-1.5 left-2 sm:top-2 sm:left-3 hidden sm:block">
+                <ReactionBar streamId={streamId} />
+              </div>
+            )}
             <input
               type="range"
               min={0}

@@ -6,6 +6,7 @@ import { userApi } from "../services/users";
 import { streamApi } from "../services/streams";
 import { eventApi } from "../services/events";
 import { commentApi } from "../services/comments";
+import { statsApi } from "../services/stats";
 import { socketMiddleware } from "../store/middleware/socketMiddleware";
 import { authListener } from "./middleware/authListener";
 
@@ -15,6 +16,7 @@ const rootReducer = combineReducers({
   [streamApi.reducerPath]: streamApi.reducer,
   [eventApi.reducerPath]: eventApi.reducer,
   [commentApi.reducerPath]: commentApi.reducer,
+  [statsApi.reducerPath]: statsApi.reducer,
   auth: authSlice.reducer,
   settings: settingsReducer,
 });
@@ -28,6 +30,7 @@ export const store = configureStore({
       .concat(streamApi.middleware)
       .concat(eventApi.middleware)
       .concat(commentApi.middleware)
+      .concat(statsApi.middleware)
       .concat(socketMiddleware)
       .concat(authListener.middleware),
 });

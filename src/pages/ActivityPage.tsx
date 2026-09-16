@@ -24,6 +24,8 @@ const EVENT_LABELS: Record<string, { label: string; streamLink: boolean }> = {
   "stream.reprocessed": { label: "Stream reprocessed", streamLink: true },
   "comment.created": { label: "You commented", streamLink: true },
   "comment.replied": { label: "You replied", streamLink: true },
+  "reaction.liked": { label: "You liked", streamLink: true },
+  "reaction.disliked": { label: "You disliked", streamLink: true },
   "user.registered": { label: "Account registered", streamLink: false },
   "user.login": { label: "You signed in", streamLink: false },
   "user.email.verified": { label: "Email verified", streamLink: false },
