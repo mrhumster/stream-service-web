@@ -385,6 +385,27 @@ export const StreamPage = () => {
                 <span>{stream.visibility}</span>
               </div>
 
+              {stream.metadata?.recorded_at && (
+                <div className="flex items-center gap-2 text-[10px] uppercase text-muted-foreground">
+                  <span className="font-bold">Recorded:</span>
+                  <span>{formatDate(stream.metadata.recorded_at)}</span>
+                </div>
+              )}
+
+              {stream.metadata?.location && (
+                <div className="flex items-center gap-2 text-[10px] uppercase text-muted-foreground">
+                  <span className="font-bold">Location:</span>
+                  <span>{stream.metadata.location}</span>
+                </div>
+              )}
+
+              {stream.metadata?.camera && (
+                <div className="flex items-center gap-2 text-[10px] uppercase text-muted-foreground">
+                  <span className="font-bold">Camera:</span>
+                  <span>{stream.metadata.camera}</span>
+                </div>
+              )}
+
               {stream.tags && stream.tags.length > 0 && (
                 <div>
                   <span className="text-[10px] uppercase font-bold text-muted-foreground">

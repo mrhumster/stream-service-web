@@ -25,6 +25,9 @@ export interface StreamMetadata {
   size: number;
   format: string;
   resolution: string;
+  recorded_at?: string;
+  location?: string;
+  camera?: string;
 }
 
 export interface StreamStorage {
