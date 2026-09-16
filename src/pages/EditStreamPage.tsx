@@ -218,6 +218,24 @@ export const EditStreamPage = () => {
     )
   }
 
+  if (stream.status === "published") {
+    return (
+      <div className="max-w-2xl mx-auto flex flex-col items-center gap-4 py-20">
+        <Lock className="size-10 text-muted-foreground" />
+        <p className="text-sm uppercase tracking-wider text-muted-foreground">
+          Published streams cannot be edited. Unpublish first.
+        </p>
+        <Link
+          to={`/streams/${id}`}
+          className="inline-flex items-center gap-2 text-xs uppercase text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" />
+          Back to Stream
+        </Link>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-2xl mx-auto">
       <Link

@@ -245,7 +245,7 @@ export const StreamPage = () => {
             </Card>
           )}
 
-          {isOwner && (
+          {isOwner && !isPublish && (
             <div className="flex items-center gap-2 mb-6">
               <Link
                 to={`/streams/${stream.id}/edit`}
