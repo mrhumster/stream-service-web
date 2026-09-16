@@ -311,6 +311,8 @@ pnpm dev
 
 ## Changelog
 
+- **Location map:** pin in Stream Details opens a dialog with an embedded Leaflet map
+  (CARTO dark tiles) + OSM/Google Maps links; lazy-loaded — 2026-09-16;
 - **Video metadata:** Recorded / Location / Camera rows in Stream Details (from
   transcoder ffprobe) — 2026-09-16;
 - **Reactions + views:** ReactionBar in the HLS player (like/dislike optimistic),

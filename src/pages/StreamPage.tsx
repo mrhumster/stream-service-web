@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
 import { toast } from "sonner";
@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { MapPin } from "lucide-react";
 import {
   useGetStreamQuery,
   useDeleteStreamMutation,
@@ -30,11 +30,27 @@ import { cn, getErrorMessage } from "@/lib/utils";
 import { ArrowLeft, Lock, PenSquare, Delete, Globe, Reload } from "pixelarticons/react";
 import { HLSPlayer } from "@/components/hls-player";
 import ProgressBar from "@/components/ui/8bit/progress-bar";
+import { parseLocation } from "@/lib/parse-location";
+
+const LocationMap = lazy(() =>
+  import("@/components/stream/location-map").then((m) => ({
+    default: m.LocationMap,
+  })),
+);
 import { useAuth } from "@/hooks/useAuth";
 import { MarqueeTitle } from "@/components/marquee-title";
 import { StreamSidebar } from "@/components/stream-sidebar";
 import type { StreamProcessingTask } from "@/types/stream.types";
 import { CommentsSection } from "@/components/comments/comments-section";
+
+const pixelBtn =
+  "inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold";
+
+const pixelBtnOutline =
+  "inline-flex items-center justify-center gap-2 bg-card text-card-foreground hover:bg-accent border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold";
+
+const pixelBtnDestructive =
+  "inline-flex items-center justify-center gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold";
 
 const taskLabels: Record<StreamProcessingTask["task_type"], string> = {
   transcode: "Transcoding",
@@ -63,6 +79,7 @@ export const StreamPage = () => {
   const [confirmAction, setConfirmAction] = useState<
     "publish" | "unpublish" | "delete" | null
   >(null);
+  const [mapOpen, setMapOpen] = useState(false);
 
   useEffect(() => {
     window.scrollTo({ top: 0 });
@@ -123,6 +140,8 @@ export const StreamPage = () => {
   }
 
   const status = statusConfig[stream.status] ?? defaultStatus;
+
+  const coords = parseLocation(stream.metadata?.location);
 
   const processingError =
     stream.processing.find((t) => t.error)?.error ?? null;
@@ -313,15 +332,19 @@ export const StreamPage = () => {
                     </DialogDescription>
                   </DialogHeader>
                   <DialogFooter>
-                    <Button
-                      variant="outline"
+                    <button
+                      type="button"
+                      className={pixelBtnOutline}
                       onClick={() => setConfirmAction(null)}
                     >
                       Cancel
-                    </Button>
-                    <Button
-                      variant={
-                        confirmAction === "delete" ? "destructive" : "default"
+                    </button>
+                    <button
+                      type="button"
+                      className={
+                        confirmAction === "delete"
+                          ? pixelBtnDestructive
+                          : pixelBtn
                       }
                       disabled={
                         (confirmAction === "publish" && isPublished) ||
@@ -356,7 +379,7 @@ export const StreamPage = () => {
                           : isDeleting
                             ? "Deleting..."
                             : "Delete"}
-                    </Button>
+                    </button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
@@ -392,12 +415,26 @@ export const StreamPage = () => {
                 </div>
               )}
 
-              {stream.metadata?.location && (
-                <div className="flex items-center gap-2 text-[10px] uppercase text-muted-foreground">
-                  <span className="font-bold">Location:</span>
-                  <span>{stream.metadata.location}</span>
-                </div>
-              )}
+              {stream.metadata?.location &&
+                (coords ? (
+                  <button
+                    type="button"
+                    onClick={() => setMapOpen(true)}
+                    aria-label="Open location map"
+                    className="inline-flex cursor-pointer items-center gap-2 text-left text-[10px] uppercase text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <MapPin className="size-3.5 shrink-0 text-primary" />
+                    <span className="font-bold">Location:</span>
+                    <span>
+                      {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
+                    </span>
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2 text-[10px] uppercase text-muted-foreground">
+                    <span className="font-bold">Location:</span>
+                    <span>{stream.metadata.location}</span>
+                  </div>
+                ))}
 
               {stream.metadata?.camera && (
                 <div className="flex items-center gap-2 text-[10px] uppercase text-muted-foreground">
@@ -453,6 +490,53 @@ export const StreamPage = () => {
               </span>
             </CardFooter>
           </Card>
+
+          {coords && (
+            <Dialog open={mapOpen} onOpenChange={setMapOpen}>
+              <DialogContent className="border-4 border-primary shadow-[8px_8px_0_0_rgba(0,0,0,1)] rounded-none sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="text-sm uppercase tracking-wider">
+                    Location
+                  </DialogTitle>
+                  <DialogDescription className="text-[10px] uppercase tracking-wider">
+                    {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="h-72 w-full sm:h-80">
+                  <Suspense
+                    fallback={
+                      <div className="flex h-full w-full items-center justify-center border-4 border-foreground bg-accent/20 text-[10px] uppercase tracking-wider text-muted-foreground animate-pulse">
+                        Loading map...
+                      </div>
+                    }
+                  >
+                    <LocationMap lat={coords.lat} lng={coords.lng} />
+                  </Suspense>
+                </div>
+                <DialogFooter className="flex flex-wrap items-center gap-2 sm:justify-end">
+                  <a
+                    className={pixelBtn}
+                    href={`https://www.openstreetmap.org/?mlat=${coords.lat}&mlon=${coords.lng}#map=16/${coords.lat}/${coords.lng}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open in OSM
+                  </a>
+                  <a
+                    className={pixelBtn}
+                    href={`https://maps.google.com/?q=${coords.lat},${coords.lng}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open in Google Maps
+                  </a>
+                  <p className="w-full text-right text-[8px] uppercase tracking-wider text-muted-foreground">
+                    © OpenStreetMap contributors
+                  </p>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
 
           <CommentsSection
             streamId={id!}
