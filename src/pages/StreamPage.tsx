@@ -245,8 +245,9 @@ export const StreamPage = () => {
             </Card>
           )}
 
-          {isOwner && !isPublish && (
+          {isOwner && (
             <div className="flex items-center gap-2 mb-6">
+              {!isPublish && (
               <Link
                 to={`/streams/${stream.id}/edit`}
                 aria-label="Update Stream"
@@ -255,6 +256,7 @@ export const StreamPage = () => {
                 <PenSquare className="size-5" />
                 <span className="hidden md:inline">Update Stream</span>
               </Link>
+              )}
               {isReady && (
                 <button
                   disabled={isPublish || isPublished}
