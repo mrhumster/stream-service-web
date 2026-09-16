@@ -60,7 +60,18 @@ UI is styled as a retro 8-bit pixel art interface with support for three themes:
 - **Mobile responsive:** hamburger nav, hidden columns on small screens;
 - **Toast notifications** (Sonner, styled as 8-bit pixel toasts);
 - **Stream cards** with square thumbnails and duration badge;
-- **Marquee title** for long titles that overflow their container.
+- **Marquee title** for long titles that overflow their container;
+- **Video metadata:** recorded date / location / camera (from transcoder ffprobe) shown in
+  Stream Details when present on the stream;
+- **Email verification:** `/verify` page (single-use token), resend, verification banner in
+  MainLayout, "Unverified" badge in profile, create-stream gate (admin bypass);
+- **Comments:** `CommentsSection` under Stream Details — markdown (react-markdown + GFM,
+  no raw HTML), replies, keyset pagination, edit/delete for authors, admin-delete,
+  comment gate (only `published` non-private streams);
+- **Activity feed (`/activity`):** who/what/when across streams and your account,
+  unread highlight + mark-read, infinite scroll;
+- **Reactions + views:** pixel ReactionBar in the HLS player (like/dislike counters,
+  optimistic updates), one view registered per playback.
 
 ## Commands
 
@@ -101,6 +112,11 @@ src/
 │   ├── theme-context.ts        # ThemeProviderContext + useTheme
 │   ├── theme-provider.tsx      # ThemeProvider with localStorage
 │   ├── video-dropzone.tsx      # react-dropzone (single/multi)
+│   ├── comments/
+│   │   ├── comments-section.tsx # stream comments (markdown, replies, pagination)
+│   │   └── markdown-body.tsx    # react-markdown + remark-gfm renderer
+│   ├── player/
+│   │   └── reaction-bar.tsx     # 8-bit like/dislike/views bar
 │   └── ui/
 │       ├── button.tsx, button-variants.ts, card.tsx, dialog.tsx
 │       ├── dropdown-menu.tsx, input.tsx, label.tsx
@@ -123,14 +139,19 @@ src/
 │   ├── stream-format.ts        # statusConfig, formatDate, thumbnailUrl
 │   └── utils.ts                # cn(), getErrorMessage()
 ├── pages/
+│   ├── ActivityPage.tsx        # activity feed (/activity)
 │   ├── CreateStreamPage.tsx    # Single/Batch upload tabs
 │   ├── EditStreamPage.tsx      # edit + HLS preview
 │   ├── MainPage.tsx            # landing page
 │   ├── OwnStreamsPage.tsx       # table/grid, sorting
 │   ├── StreamPage.tsx          # detail + player + owner actions
-│   └── StreamsPage.tsx         # catalog, infinite scroll
+│   ├── StreamsPage.tsx         # catalog, infinite scroll
+│   └── VerifyPage.tsx          # email verification token
 ├── services/
-│   ├── auth.ts                 # login, register, logout
+│   ├── auth.ts                 # login, register, logout, verify/resend
+│   ├── comments.ts             # commentApi (list/create/update/delete)
+│   ├── events.ts               # eventApi (activity feed)
+│   ├── stats.ts                # statsApi (reactions + views)
 │   ├── streams.ts              # CRUD + upload (single/multipart)
 │   └── users.ts                # whoami, lists (with reauth)
 ├── store/
@@ -154,6 +175,8 @@ src/
 | `/streams/create` | Create stream | **authenticated only** |
 | `/streams/own` | My streams | **authenticated only** |
 | `/streams/:id/edit` | Edit stream | **authenticated only** |
+| `/verify` | Email verification (token) | public |
+| `/activity` | Activity feed | **authenticated only** |
 
 Private routes wrapped in `ProtectedRoute`: no token → redirect to `/`.
 
@@ -224,6 +247,7 @@ Defaults are set in `.env` (local dev) and `Dockerfile` ARGs (Docker/K8s builds)
 | `VITE_STORAGE_URL` | `https://storage.example.com/go-app-bucket/thumbnails` | stream-format.ts (thumbnails) |
 | `VITE_EVENTS_URL` | `https://events.example.com` | events.ts (activity feed) |
 | `VITE_COMMENTS_URL` | `https://comments.example.com` | comments.ts (comments section) |
+| `VITE_STATS_URL` | `https://stats.example.com` | stats.ts (reactions + views) |
 
 To override for Docker builds:
 
@@ -287,6 +311,16 @@ pnpm dev
 
 ## Changelog
 
+- **Video metadata:** Recorded / Location / Camera rows in Stream Details (from
+  transcoder ffprobe) — 2026-09-16;
+- **Reactions + views:** ReactionBar in the HLS player (like/dislike optimistic),
+  `registerView` on first play, `VITE_STATS_URL` — 2026-09-16;
+- **Comments gate:** composer hidden on non-`published`/`private` streams
+  (`allowComments`) — 2026-09-15;
+- **Comments:** markdown section under Stream Details, replies, edit/delete,
+  keyset pagination, `VITE_COMMENTS_URL` — 2026-09-15;
+- **Activity feed:** `/activity`, unread badges, mark-read, `VITE_EVENTS_URL` — 2026-09-14;
+- **Email verification:** `/verify`, banner, profile badge, create-stream gate — 2026-09-11;
 - **WS subprotocol auth:** token moved from `?token=` to `Sec-WebSocket-Protocol`
   (matches backend `WSProtocolAuth`, fixes handshake with gorilla/websocket);
 - **Dead code removed:** `useVideoProgress`, `videoProgress` slice,
