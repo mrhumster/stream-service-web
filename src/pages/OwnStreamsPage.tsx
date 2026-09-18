@@ -22,6 +22,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import type { StreamResponse } from "@/types/stream.types";
+import { ShareButton } from "@/components/stream/share-button";
 
 type ViewMode = "grid" | "table";
 type SortField = "created_at" | "title" | "status";
@@ -219,6 +220,7 @@ export const OwnStreamsPage = () => {
                   Created <SortIcon field="created_at" activeField={sortField} direction={sortDir} />
                 </button>
               </TableHead>
+              <TableHead className="w-16 hidden md:table-cell">Link</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -275,6 +277,13 @@ export const OwnStreamsPage = () => {
                     <span className="text-[10px] uppercase text-muted-foreground">
                       {formatDate(stream.created_at)}
                     </span>
+                  </TableCell>
+
+                  {/* Link (share for unlisted) */}
+                  <TableCell className="hidden md:table-cell">
+                    {stream.visibility === "unlisted" && (
+                      <ShareButton iconOnly className="scale-90" />
+                    )}
                   </TableCell>
                 </TableRow>
               );

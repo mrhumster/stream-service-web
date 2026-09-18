@@ -37,7 +37,10 @@ UI is styled as a retro 8-bit pixel art interface with support for three themes:
   transcode shows an error panel with a **Reprocess** button (owner/admin), which
   re-enqueues the processing tasks (tracked per-task in a `processing` array:
   `transcode` + `thumbnail`);
-- **Stream visibility:** `public`, `private`, `unlisted`;
+- **Stream visibility:** `public`, `private`, `unlisted` — `unlisted` = "shared by link" (hidden from
+  the catalog, anyone with the URL can watch): Share button copies the link, the stream page renders
+  for the non-owner (player, details, comments, reactions) without any owner controls,
+  and Stream Details shows `(anyone with the link can watch)`;
 - **Publish / unpublish** streams;
 - **HLS player** with:
   - Bearer token authorization on playlist/segment requests;
@@ -55,7 +58,8 @@ UI is styled as a retro 8-bit pixel art interface with support for three themes:
   events invalidate RTK Query tags);
 - **Public catalog** with infinite scroll (IntersectionObserver);
 - **My Streams** page with table/grid toggle, default table view,
-  client-side sorting by Title/Status/Created;
+  client-side sorting by Title/Status/Created, and a quick Share (copy-link)
+  action for `unlisted` streams in the table;
 - **Edit page** with HLS player preview for ready/published streams;
 - **Mobile responsive:** hamburger nav, hidden columns on small screens;
 - **Toast notifications** (Sonner, styled as 8-bit pixel toasts);

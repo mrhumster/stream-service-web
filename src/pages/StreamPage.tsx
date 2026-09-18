@@ -42,6 +42,7 @@ import { MarqueeTitle } from "@/components/marquee-title";
 import { StreamSidebar } from "@/components/stream-sidebar";
 import type { StreamProcessingTask } from "@/types/stream.types";
 import { CommentsSection } from "@/components/comments/comments-section";
+import { ShareButton } from "@/components/stream/share-button";
 
 const pixelBtn =
   "inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold";
@@ -264,8 +265,11 @@ export const StreamPage = () => {
             </Card>
           )}
 
-          {isOwner && (
+          {(isOwner || stream.visibility === "unlisted") && (
             <div className="flex items-center gap-2 mb-6">
+              {stream.visibility === "unlisted" && <ShareButton />}
+              {isOwner && (
+              <>
               {!isPublish && (
               <Link
                 to={`/streams/${stream.id}/edit`}
@@ -275,6 +279,8 @@ export const StreamPage = () => {
                 <PenSquare className="size-5" />
                 <span className="hidden md:inline">Update Stream</span>
               </Link>
+              )}
+              </>
               )}
               {isReady && (
                 <button
@@ -406,6 +412,11 @@ export const StreamPage = () => {
               <div className="flex items-center gap-2 text-[10px] uppercase text-muted-foreground">
                 <span className="font-bold">Visibility:</span>
                 <span>{stream.visibility}</span>
+                {stream.visibility === "unlisted" && (
+                  <span className="text-[9px] text-primary/80">
+                    (anyone with the link can watch)
+                  </span>
+                )}
               </div>
 
               {stream.metadata?.recorded_at && (
