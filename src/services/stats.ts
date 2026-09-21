@@ -71,6 +71,9 @@ export const statsApi = createApi({
         url: `streams/${streamId}/views`,
         method: "POST",
       }),
+      invalidatesTags: (_, __, streamId) => [
+        { type: "StreamStats", id: streamId },
+      ],
     }),
   }),
 });

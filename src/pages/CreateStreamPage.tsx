@@ -95,6 +95,8 @@ export const CreateStreamPage = () => {
   const [countdown, setCountdown] = useState(10);
   const [batchTags, setBatchTags] = useState<string[]>([]);
   const [batchTagInput, setBatchTagInput] = useState("");
+  const [batchVisibility, setBatchVisibility] =
+    useState<StreamVisibility>("public");
 
   const batchDoneCount = batchQueue.filter(
     (i) => i.status === "done",
@@ -209,13 +211,16 @@ export const CreateStreamPage = () => {
     async (item: BatchItem): Promise<boolean> => {
       updateBatchItem(item.id, { status: "creating", progress: 0 });
       try {
-        const stream = await createStream({
-          title: item.title,
-          description: "",
-          tags: batchTags,
-          visibility: "public",
-        }).unwrap();
-        const streamId = stream.id;
+        let streamId = item.streamId;
+        if (!streamId) {
+          const stream = await createStream({
+            title: item.title,
+            description: "",
+            tags: batchTags,
+            visibility: batchVisibility,
+          }).unwrap();
+          streamId = stream.id;
+        }
         updateBatchItem(item.id, { streamId, status: "uploading" });
 
         const minChunkSize = 5 * 1024 * 1024;
@@ -236,7 +241,7 @@ export const CreateStreamPage = () => {
         return false;
       }
     },
-    [createStream, uploadVideo, processUpload, updateBatchItem, batchTags],
+    [createStream, uploadVideo, processUpload, updateBatchItem, batchTags, batchVisibility],
   );
 
   // ── Batch: start upload ──
@@ -299,6 +304,7 @@ export const CreateStreamPage = () => {
     setCountdown(10);
     setBatchTags([]);
     setBatchTagInput("");
+    setBatchVisibility("public");
   }, [isBatchRunning]);
 
   return (
@@ -514,6 +520,32 @@ export const CreateStreamPage = () => {
                       ))}
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Batch visibility */}
+              {!isBatchRunning && (
+                <div className="flex flex-col gap-2">
+                  <Label className="text-[10px] uppercase">
+                    Visibility (applied to all)
+                  </Label>
+                  <div className="flex gap-2">
+                    {(["public", "private", "unlisted"] as const).map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => setBatchVisibility(v)}
+                        className={cn(
+                          "px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors",
+                          batchVisibility === v
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground hover:bg-muted/80",
+                        )}
+                      >
+                        {v}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 

@@ -21,6 +21,7 @@ import { useState } from "react";
 import { useGetAuthUserQuery } from "@/services/users";
 import { useLogoutMutation } from "@/services/auth";
 import { useAppDispatch, useAppSelector } from "@/hooks";
+import { eraseAuth } from "@/feature/auth/authSlice";
 import { EmailVerificationBanner } from "@/components/email-verification";
 import { setAutoplay, setTheme } from "@/feature/settings/settingsSlice";
 import { useTheme, type Theme } from "@/components/theme-context";
@@ -29,8 +30,8 @@ export const MainLayout = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const { data } = useGetAuthUserQuery();
   const auth = useAuth();
+  const { data } = useGetAuthUserQuery(undefined, { skip: !auth.isAuth });
   const [logout] = useLogoutMutation();
   const dispatch = useAppDispatch();
   const { autoplay, theme: themeSetting } = useAppSelector((s) => s.settings);
@@ -202,7 +203,11 @@ export const MainLayout = () => {
                       </DialogContent>
                     </Dialog>
                     <button
-                      onClick={() => logout()}
+                      onClick={() =>
+                        void logout()
+                          .unwrap()
+                          .finally(() => dispatch(eraseAuth()))
+                      }
                       className="bg-destructive text-destructive-foreground px-4 py-1 text-[10px] uppercase font-bold shadow-[4px_4px_0_0_rgba(0,0,0,0.2)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]"
                     >
                       Logout
@@ -282,7 +287,11 @@ export const MainLayout = () => {
                   {auth.isAuth ? (
                     <DropdownMenuItem
                       variant="destructive"
-                      onSelect={() => logout()}
+                      onSelect={() =>
+                        void logout()
+                          .unwrap()
+                          .finally(() => dispatch(eraseAuth()))
+                      }
                     >
                       Logout
                     </DropdownMenuItem>

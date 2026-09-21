@@ -189,6 +189,7 @@ export function CommentsSection({
                 comment={comment}
                 streamId={streamId}
                 canComment={writeable}
+                onMutated={resetPages}
               />
             ))}
           </ul>
@@ -219,10 +220,12 @@ function CommentItem({
   comment,
   streamId,
   canComment,
+  onMutated,
 }: {
   comment: Comment;
   streamId: string;
   canComment: boolean;
+  onMutated?: () => void;
 }) {
   const authUser = useAppSelector((state) => state.auth.authUser);
   const isAuthor = !!authUser && authUser.id === comment.user_id;
@@ -255,6 +258,7 @@ function CommentItem({
       setReplyDraft("");
       setReplying(false);
       setShowReplies(true);
+      onMutated?.();
       toast.success("Reply posted");
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -270,6 +274,7 @@ function CommentItem({
     try {
       await updateComment({ id: comment.id, body }).unwrap();
       setEditing(false);
+      onMutated?.();
       toast.success("Comment updated");
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -280,6 +285,7 @@ function CommentItem({
     if (!window.confirm("Delete this comment?")) return;
     try {
       await deleteComment(comment.id).unwrap();
+      onMutated?.();
       toast.success("Comment deleted");
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -406,19 +412,20 @@ function CommentItem({
 
       {showReplies && (
         <div className="pl-6 border-l-2 border-foreground/10 flex flex-col gap-3 mt-1">
-          <ReplyList parentId={comment.id} />
+          <ReplyList parentId={comment.id} onMutated={onMutated} />
         </div>
       )}
     </li>
   );
 }
 
-function ReplyList({ parentId }: { parentId: string }) {
+function ReplyList({ parentId, onMutated }: { parentId: string; onMutated?: () => void }) {
   const { data: firstPage, isFetching } = useListRepliesQuery({
     parentId,
     limit: PAGE,
   });
   const [extraPages, setExtraPages] = useState<CommentListResponse[]>([]);
+  const resetPages = useCallback(() => setExtraPages([]), []);
   const [loadMoreTrigger, { isFetching: isLoadingMore }] =
     useLazyListRepliesQuery();
 
@@ -453,7 +460,14 @@ function ReplyList({ parentId }: { parentId: string }) {
   return (
     <ul className="flex flex-col gap-3">
       {replies.map((reply) => (
-        <ReplyItem key={reply.id} reply={reply} />
+        <ReplyItem
+          key={reply.id}
+          reply={reply}
+          onMutated={() => {
+            resetPages();
+            onMutated?.();
+          }}
+        />
       ))}
       {hasMore && (
         <li>
@@ -483,7 +497,7 @@ function ReplyList({ parentId }: { parentId: string }) {
   );
 }
 
-function ReplyItem({ reply }: { reply: Comment }) {
+function ReplyItem({ reply, onMutated }: { reply: Comment; onMutated?: () => void }) {
   const authUser = useAppSelector((state) => state.auth.authUser);
   const isAuthor = !!authUser && authUser.id === reply.user_id;
   const isAdmin = authUser?.role === "admin";
@@ -533,6 +547,7 @@ function ReplyItem({ reply }: { reply: Comment }) {
                 try {
                   await updateComment({ id: reply.id, body }).unwrap();
                   setEditing(false);
+                  onMutated?.();
                   toast.success("Comment updated");
                 } catch (err) {
                   toast.error(getErrorMessage(err));
@@ -563,6 +578,7 @@ function ReplyItem({ reply }: { reply: Comment }) {
               if (!window.confirm("Delete this comment?")) return;
               try {
                 await deleteComment(reply.id).unwrap();
+                onMutated?.();
                 toast.success("Comment deleted");
               } catch (err) {
                 toast.error(getErrorMessage(err));

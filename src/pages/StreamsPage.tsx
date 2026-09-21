@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth"
 import { useListStreamsPublicQuery } from "@/services/streams"
 import { Plus, Loader2, X } from "lucide-react"
 
-const PAGE_SIZE = 9
+const PAGE_SIZE = 24
 
 export const StreamsPage = () => {
   const { isAuth } = useAuth()

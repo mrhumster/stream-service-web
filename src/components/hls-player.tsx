@@ -288,8 +288,12 @@ export const HLSPlayer = ({
       console.error("HLS Error Detail:", data);
       if (data.response && data.response.code === 403) {
         setIsForbidden(true);
-        const responseText = JSON.parse(data.networkDetails.responseText);
-        setErrorMessage(responseText.error);
+        try {
+          const responseText = JSON.parse(data.networkDetails.responseText);
+          setErrorMessage(responseText.error);
+        } catch {
+          setErrorMessage("Access denied — you don't have permission to watch this stream.");
+        }
       }
     });
     hls.loadSource(antiCacheUrl);
@@ -467,7 +471,9 @@ export const HLSPlayer = ({
                 video.currentTime / video.duration >= VIEW_THRESHOLD
               ) {
                 registeredFor.current = streamId;
-                registerView(streamId);
+                registerView(streamId).catch(() => {
+                  // view registration is best-effort; ignore failures
+                });
               }
             }}
             onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
