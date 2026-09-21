@@ -50,7 +50,7 @@ export function CommentsSection({
   const { data: firstPage, isFetching } = useListCommentsQuery({
     streamId,
     limit: PAGE,
-  });
+  }, { skip: !allowComments });
   const [extraPages, setExtraPages] = useState<CommentListResponse[]>([]);
   const resetPages = useCallback(() => setExtraPages([]), []);
   const [loadMoreTrigger, { isFetching: isLoadingMore }] =
