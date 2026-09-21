@@ -4,8 +4,10 @@ import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useVerifyMutation } from "@/services/auth";
+import { userApi } from "@/services/users";
 import { useAppDispatch } from "@/hooks";
-import { eraseAuth } from "@/feature/auth/authSlice";
+import { tokenReceived, eraseAuth } from "@/feature/auth/authSlice";
+import type { LoginResponse } from "@/types/auth.types";
 
 type VerifyStatus = "idle" | "verifying" | "verified" | "error";
 
@@ -24,10 +26,25 @@ export const VerifyPage = () => {
     attemptedRef.current = true;
     verify({ token })
       .unwrap()
-      .then(() => {
-        // Сброс stale access token: claim email_verified в JWT ещё старый,
-        // пока юзер не перелогинится.
-        dispatch(eraseAuth());
+      .then((res) => {
+        // Backend теперь выдаёт свежую токен-пару: email_verified в JWT
+        // обновлён, поэтому перелогин не нужен. Старые ответы (только
+        // {verified}) фолбэком разлогинивают юзера, чтобы claim обновился.
+        if (res.access_token) {
+          const session: LoginResponse = {
+            access_token: res.access_token,
+            expires_in: res.expires_in ?? 0,
+            token_type: res.token_type ?? "Bearer",
+          };
+          dispatch(tokenReceived(session));
+          dispatch(
+            userApi.endpoints.getAuthUser.initiate(undefined, {
+              forceRefetch: true,
+            }),
+          );
+        } else {
+          dispatch(eraseAuth());
+        }
         setStatus("verified");
       })
       .catch(() => setStatus("error"));
@@ -68,10 +85,10 @@ export const VerifyPage = () => {
               <CheckCircle2 className="size-10 text-green-600" />
               <p className="text-xs uppercase font-bold">Email verified!</p>
               <p className="text-[10px] uppercase text-muted-foreground text-center">
-                Sign in again to refresh your session.
+                Your session is ready.
               </p>
               <Button asChild className="mt-2 uppercase text-xs h-10 border-4 border-black rounded-none">
-                <Link to="/">Sign In</Link>
+                <Link to="/streams">Start Browsing</Link>
               </Button>
             </>
           ) : (

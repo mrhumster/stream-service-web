@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { StreamCard } from "@/components/stream-card";
 import { useAuth } from "@/hooks/useAuth";
@@ -26,6 +26,8 @@ import { ShareButton } from "@/components/stream/share-button";
 
 type ViewMode = "grid" | "table";
 type SortField = "created_at" | "title" | "status";
+
+const PAGE_SIZE = 50;
 
 function ThumbCell({ stream }: { stream: StreamResponse }) {
   const [broken, setBroken] = useState(false);
@@ -81,8 +83,35 @@ export const OwnStreamsPage = () => {
   const { isAuth } = useAuth();
   const navigate = useNavigate();
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const [offset, setOffset] = useState(0);
 
-  const { data, isLoading, isFetching, error } = useListOwnStreamsQuery();
+  const { data, isLoading, isFetching, error } = useListOwnStreamsQuery({
+    limit: PAGE_SIZE,
+    offset,
+  });
+
+  const hasMore = data ? data.items.length < data.total : false;
+
+  const loadMore = useCallback(() => {
+    if (!isFetching && hasMore && data) {
+      setOffset(data.items.length);
+    }
+  }, [isFetching, hasMore, data]);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) loadMore();
+      },
+      { threshold: 0.1 },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [loadMore]);
 
   const [viewMode, setViewMode] = useState<ViewMode>("table");
   const [sortField, setSortField] = useState<SortField>("created_at");

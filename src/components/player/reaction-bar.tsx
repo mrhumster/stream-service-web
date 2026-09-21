@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Eye, ThumbsDown, ThumbsUp } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
@@ -46,11 +46,26 @@ function StatButton({
 
 export function ReactionBar({ streamId }: { streamId: string }) {
   const { isAuth } = useAuth();
-  const { data, isLoading, isError } = useGetStatsQuery(streamId);
+  const { data, isLoading, isError, refetch } = useGetStatsQuery(streamId);
   const [setReaction, { isLoading: isMutating }] = useSetReactionMutation();
   const [optimist, setOptimist] = useState<StreamStats | null>(null);
   const [hint, setHint] = useState<string | null>(null);
   const [hintNonce, setHintNonce] = useState(0);
+  const refetchedForAuthRef = useRef(false);
+
+  // Кэш stats мог быть заполнен ещё гостем (my_reaction отсутствует). Когда
+  // пользователь залогинился, дёргаем стрим заново, чтобы увидеть его реакцию.
+  useEffect(() => {
+    if (
+      isAuth &&
+      data &&
+      !data.my_reaction &&
+      !refetchedForAuthRef.current
+    ) {
+      refetchedForAuthRef.current = true;
+      void refetch();
+    }
+  }, [isAuth, data, refetch]);
 
   const stats: StreamStats | null = optimist ?? data ?? null;
 

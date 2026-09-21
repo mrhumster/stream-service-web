@@ -79,10 +79,23 @@ export const streamApi = createApi({
         { type: "Stream" as const, id: "LIST" },
       ],
     }),
-    listOwnStreams: builder.query<StreamListResponse, void>({
-      query: () => {
-        return `stream/own`;
+    listOwnStreams: builder.query<StreamListResponse, StreamListParams>({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        searchParams.set("limit", String(params.limit ?? 10));
+        searchParams.set("offset", String(params.offset ?? 0));
+        return `stream/own?${searchParams.toString()}`;
       },
+      serializeQueryArgs: ({ endpointName }) => endpointName,
+      merge: (currentCache, newItems) => {
+        if (newItems.offset === 0) return newItems;
+        return {
+          ...newItems,
+          items: [...currentCache.items, ...newItems.items],
+        };
+      },
+      forceRefetch: ({ currentArg, previousArg }) =>
+        currentArg?.offset !== previousArg?.offset,
       providesTags: (result) =>
         result
           ? [

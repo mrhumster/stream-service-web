@@ -8,7 +8,7 @@ import {
 import { type RootState } from "../store/store.ts";
 import { eraseAuth, tokenReceived } from "../feature/auth/authSlice";
 import type { LoginResponse } from "../types/auth.types.ts";
-import type { UserResponse, UsersListReponse } from "../types/user.types.ts";
+import type { UserResponse } from "../types/user.types.ts";
 
 const baseQuery = fetchBaseQuery({
   baseUrl: import.meta.env.VITE_API_URL as string,
@@ -47,13 +47,10 @@ export const userApi = createApi({
   reducerPath: "userApi",
   baseQuery: baseQueryWithReauth,
   endpoints: (builder) => ({
-    getUsers: builder.query<UsersListReponse, void>({
-      query: () => "auth/users",
-    }),
     getAuthUser: builder.query<UserResponse, void>({
       query: () => "auth/who",
     }),
   }),
 });
 
-export const { useGetUsersQuery, useGetAuthUserQuery } = userApi;
+export const { useGetAuthUserQuery } = userApi;

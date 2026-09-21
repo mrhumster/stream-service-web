@@ -20,6 +20,9 @@ export interface VerifyRequest {
 
 export interface VerifyResponse {
   verified: boolean;
+  access_token?: string;
+  expires_in?: number;
+  token_type?: string;
 }
 
 export interface Success {

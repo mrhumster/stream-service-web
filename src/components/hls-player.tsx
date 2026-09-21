@@ -79,6 +79,7 @@ export const HLSPlayer = ({
     typeof window !== "undefined" &&
     window.matchMedia("(pointer: coarse)").matches;
   const [showHelp, setShowHelp] = useState(false);
+  const [hlsSupported] = useState<boolean>(() => Hls.isSupported());
   const [volFlash, setVolFlash] = useState<{
     dir: "up" | "down";
     nonce: number;
@@ -255,8 +256,6 @@ export const HLSPlayer = ({
 
     registeredFor.current = null;
 
-    let hls: Hls | null = null;
-    let bgHls: Hls | null = null;
     const antiCacheUrl = src.includes("?")
       ? `${src}&t=${Date.now()}`
       : `${src}?t=${Date.now()}`;
@@ -273,48 +272,47 @@ export const HLSPlayer = ({
       }
     };
 
-    if (video.canPlayType("application/vnd.apple.mpegcurl")) {
-      video.src = src;
-      if (bgVideo) bgVideo.src = src;
-    } else if (Hls.isSupported()) {
-      hls = new Hls({
+    // Всегда через hls.js: нативные (mpegurl/mpegcurl) пути не могут слать
+    // Authorization, а приватные стримы без Bearer недоступны.
+    if (!hlsSupported) return;
+    const hls = new Hls({
+      enableWorker: false,
+      manifestLoadingMaxRetry: 1,
+      xhrSetup: makeXhrSetup(),
+    });
+    hls.on(Hls.Events.MANIFEST_LOADED, () => {
+      setIsForbidden(false);
+      setErrorMessage(null);
+    });
+    hls.on(Hls.Events.ERROR, (_event, data) => {
+      console.error("HLS Error Detail:", data);
+      if (data.response && data.response.code === 403) {
+        setIsForbidden(true);
+        const responseText = JSON.parse(data.networkDetails.responseText);
+        setErrorMessage(responseText.error);
+      }
+    });
+    hls.loadSource(antiCacheUrl);
+    hls.attachMedia(video);
+
+    let bgHls: Hls | null = null;
+    if (bgVideo) {
+      bgHls = new Hls({
         enableWorker: false,
         manifestLoadingMaxRetry: 1,
         xhrSetup: makeXhrSetup(),
       });
-      hls.on(Hls.Events.MANIFEST_LOADED, () => {
-        setIsForbidden(false);
-        setErrorMessage(null);
-      });
-      hls.on(Hls.Events.ERROR, (_event, data) => {
-        console.error("HLS Error Detail:", data);
-        if (data.response && data.response.code === 403) {
-          setIsForbidden(true);
-          const responseText = JSON.parse(data.networkDetails.responseText);
-          setErrorMessage(responseText.error);
-        }
-      });
-      hls.loadSource(antiCacheUrl);
-      hls.attachMedia(video);
-
-      if (bgVideo) {
-        bgHls = new Hls({
-          enableWorker: false,
-          manifestLoadingMaxRetry: 1,
-          xhrSetup: makeXhrSetup(),
-        });
-        bgHls.loadSource(antiCacheUrl);
-        bgHls.attachMedia(bgVideo);
-      }
-
-      return () => {
-        if (hls) hls.destroy();
-        if (bgHls) bgHls.destroy();
-        video.src = "";
-        if (bgVideo) bgVideo.src = "";
-      };
+      bgHls.loadSource(antiCacheUrl);
+      bgHls.attachMedia(bgVideo);
     }
-  }, [src, isAuth, token, isInitializing]);
+
+    return () => {
+      if (hls) hls.destroy();
+      if (bgHls) bgHls.destroy();
+      video.src = "";
+      if (bgVideo) bgVideo.src = "";
+    };
+  }, [src, isAuth, token, isInitializing, hlsSupported]);
 
   if (isInitializing) {
     return (
@@ -337,7 +335,13 @@ export const HLSPlayer = ({
           : "relative aspect-video bg-zinc-950 rounded-none"
       }`}
     >
-      {isForbidden ? (
+      {!hlsSupported ? (
+        <div className="flex flex-col items-center justify-center w-full h-full p-6 text-center">
+          <h3 className="text-lg font-semibold text-zinc-100 uppercase tracking-wider">
+            HLS playback is not supported on this browser
+          </h3>
+        </div>
+      ) : isForbidden ? (
         <div className="flex flex-col items-center justify-center w-full h-full p-6 text-center animate-in fade-in duration-500">
           <div className="flex items-center justify-center w-16 h-16 mb-4 rounded-full bg-destructive/10 text-destructive">
             <Lock className="size-5" />
