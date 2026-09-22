@@ -146,6 +146,7 @@ src/
 │   ├── ActivityPage.tsx        # activity feed (/activity)
 │   ├── CreateStreamPage.tsx    # Single/Batch upload tabs
 │   ├── EditStreamPage.tsx      # edit + HLS preview
+│   ├── HelpPage.tsx            # static help guide (/help)
 │   ├── MainPage.tsx            # landing page
 │   ├── OwnStreamsPage.tsx       # table/grid, sorting
 │   ├── StreamPage.tsx          # detail + player + owner actions
@@ -180,6 +181,7 @@ src/
 | `/streams/own` | My streams | **authenticated only** |
 | `/streams/:id/edit` | Edit stream | **authenticated only** |
 | `/verify` | Email verification (token) | public |
+| `/help` | Help guide | public |
 | `/activity` | Activity feed | **authenticated only** |
 
 Private routes wrapped in `ProtectedRoute`: no token → redirect to `/`.
@@ -315,6 +317,8 @@ pnpm dev
 
 ## Changelog
 
+- **Help guide:** public `/help` page with topic sections + FAQ, Help link in
+  header nav (desktop + mobile) — 2026-09-22;
 - **Location map:** pin in Stream Details opens a dialog with an embedded Leaflet map
   (CARTO dark tiles) + OSM/Google Maps links; lazy-loaded — 2026-09-16;
 - **Video metadata:** Recorded / Location / Camera rows in Stream Details (from

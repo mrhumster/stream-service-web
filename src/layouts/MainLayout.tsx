@@ -66,6 +66,14 @@ export const MainLayout = () => {
                   Streams
                 </Link>
               </li>
+              <li>
+                <Link
+                  to="/help"
+                  className="uppercase font-bold hover:text-primary hover:underline underline-offset-4 decoration-4 transition-colors"
+                >
+                  Help
+                </Link>
+              </li>
               {auth.isAuth ? (
                 <>
                   <li className="flex items-center gap-3">
@@ -273,6 +281,9 @@ export const MainLayout = () => {
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem asChild>
                     <Link to="/streams">Streams</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/help">Help</Link>
                   </DropdownMenuItem>
                   {auth.isAuth && (
                     <DropdownMenuItem asChild>

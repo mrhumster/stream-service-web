@@ -9,6 +9,7 @@ import { ActivityPage } from "./pages/ActivityPage";
 import { ProtectedRoute } from "./components/protected-route";
 import { ThemeProvider } from "@/components/theme-provider";
 import { OwnStreamsPage } from "./pages/OwnStreamsPage";
+import { HelpPage } from "./pages/HelpPage";
 import { Toaster } from "sonner";
 import { useAppSelector } from "@/hooks";
 
@@ -19,6 +20,7 @@ const router = createBrowserRouter([
       { path: "/", element: <StreamsPage /> },
       { path: "/streams", element: <StreamsPage /> },
       { path: "/verify", element: <VerifyPage /> },
+      { path: "/help", element: <HelpPage /> },
       {
         element: <ProtectedRoute />,
         children: [
