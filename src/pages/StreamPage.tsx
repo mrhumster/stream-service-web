@@ -18,6 +18,7 @@ import {
   usePublishStreamMutation,
   useUnpublishStreamMutation,
   useReprocessStreamMutation,
+  useProcessFacesStreamMutation,
 } from "@/services/streams";
 import { useVideoUrl } from "@/hooks/useVideoUrl";
 import {
@@ -27,7 +28,7 @@ import {
 } from "@/lib/stream-format";
 import { useAppSelector } from "@/hooks";
 import { cn, getErrorMessage } from "@/lib/utils";
-import { ArrowLeft, Lock, PenSquare, Delete, Globe, Reload } from "pixelarticons/react";
+import { ArrowLeft, Lock, PenSquare, Delete, Globe, Reload, User } from "pixelarticons/react";
 import { HLSPlayer } from "@/components/hls-player";
 import ProgressBar from "@/components/ui/8bit/progress-bar";
 import { parseLocation } from "@/lib/parse-location";
@@ -56,6 +57,7 @@ const pixelBtnDestructive =
 const taskLabels: Record<StreamProcessingTask["task_type"], string> = {
   transcode: "Transcoding",
   thumbnail: "Thumbnail",
+  faces: "Faces",
 };
 
 export const StreamPage = () => {
@@ -77,6 +79,8 @@ export const StreamPage = () => {
     useUnpublishStreamMutation();
   const [reprocessStream, { isLoading: isReprocessing }] =
     useReprocessStreamMutation();
+  const [processFaces, { isLoading: isProcessingFaces }] =
+    useProcessFacesStreamMutation();
   const [confirmAction, setConfirmAction] = useState<
     "publish" | "unpublish" | "delete" | null
   >(null);
@@ -151,6 +155,15 @@ export const StreamPage = () => {
     try {
       await reprocessStream({ id: stream!.id }).unwrap();
       toast.success("Processing restarted");
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
+  };
+
+  const handleProcessFaces = async () => {
+    try {
+      await processFaces({ id: stream!.id }).unwrap();
+      toast.success("Face detection started");
     } catch (err) {
       toast.error(getErrorMessage(err));
     }
@@ -280,6 +293,21 @@ export const StreamPage = () => {
                 <span className="hidden md:inline">Update Stream</span>
               </Link>
               )}
+              {isReady || isPublish ? (
+                <button
+                  disabled={isProcessingFaces}
+                  onClick={handleProcessFaces}
+                  aria-label={
+                    isProcessingFaces ? "Detecting faces..." : "Detect Faces"
+                  }
+                  className="cursor-pointer inline-flex items-center justify-center min-w-9 gap-2 bg-card text-card-foreground hover:bg-accent border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-3 sm:px-4 font-bold disabled:opacity-50"
+                >
+                  <User className="size-5" />
+                  <span className="hidden md:inline">
+                    {isProcessingFaces ? "Detecting faces..." : "Detect Faces"}
+                  </span>
+                </button>
+              ) : null}
               </>
               )}
               {isReady && (

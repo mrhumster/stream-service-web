@@ -1,5 +1,5 @@
 import { Link, Outlet } from "react-router-dom";
-import { Menu, Sun, Star, Moon, Monitor, ChevronDown, ShieldAlert, Activity as ActivityIcon } from "lucide-react";
+import { Menu, Sun, Star, Moon, Monitor, ChevronDown, ShieldAlert, Activity as ActivityIcon, Users as UsersIcon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -91,6 +91,15 @@ export const MainLayout = () => {
                     >
                       <ActivityIcon className="size-3.5" />
                       Activity
+                    </Link>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <Link
+                      to="/people"
+                      className="inline-flex items-center gap-1.5 uppercase font-bold hover:text-primary hover:underline underline-offset-4 decoration-4 transition-colors"
+                    >
+                      <UsersIcon className="size-3.5" />
+                      People
                     </Link>
                   </li>
                   <li className="flex items-center gap-3">
@@ -293,6 +302,11 @@ export const MainLayout = () => {
                   {auth.isAuth && (
                     <DropdownMenuItem asChild>
                       <Link to="/activity">Activity</Link>
+                    </DropdownMenuItem>
+                  )}
+                  {auth.isAuth && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/people">People</Link>
                     </DropdownMenuItem>
                   )}
                   {auth.isAuth ? (

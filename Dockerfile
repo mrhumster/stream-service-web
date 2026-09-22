@@ -9,6 +9,7 @@ ARG VITE_STORAGE_URL=https://storage.example.com/go-app-bucket/thumbnails
 ARG VITE_EVENTS_URL=https://events.example.com
 ARG VITE_COMMENTS_URL=https://comments.example.com
 ARG VITE_STATS_URL=https://stats.example.com
+ARG VITE_FACES_URL=https://faces.example.com
 
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_WS_URL=$VITE_WS_URL
@@ -17,6 +18,7 @@ ENV VITE_STORAGE_URL=$VITE_STORAGE_URL
 ENV VITE_EVENTS_URL=$VITE_EVENTS_URL
 ENV VITE_COMMENTS_URL=$VITE_COMMENTS_URL
 ENV VITE_STATS_URL=$VITE_STATS_URL
+ENV VITE_FACES_URL=$VITE_FACES_URL
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 RUN pnpm install --frozen-lockfile --config.confirmModulesPurge=false --config.packagesIgnoreBuiltDependencies='[]' --config.packagesOnlyBuiltDependencies='["esbuild","msw"]'

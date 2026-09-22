@@ -75,7 +75,12 @@ UI is styled as a retro 8-bit pixel art interface with support for three themes:
 - **Activity feed (`/activity`):** who/what/when across streams and your account,
   unread highlight + mark-read, infinite scroll;
 - **Reactions + views:** pixel ReactionBar in the HLS player (like/dislike counters,
-  optimistic updates), one view registered per playback.
+  optimistic updates), one view registered per playback;
+- **Face detection («Свои люди»):** owner/admin can run face clustering on a ready/published
+  stream (a `faces` processing task appears alongside transcode/thumbnail); `/people` lists
+  detected people clusters (sample/video counts), `/people/:clusterId` shows per-stream
+  occurrences (timestamp + confidence) and supports renaming a person via PATCH
+  (`VITE_FACES_URL` → faces-service).
 
 ## Commands
 
@@ -149,6 +154,8 @@ src/
 │   ├── HelpPage.tsx            # static help guide (/help)
 │   ├── MainPage.tsx            # landing page
 │   ├── OwnStreamsPage.tsx       # table/grid, sorting
+│   ├── PeoplePage.tsx          # face clusters (/people)
+│   ├── PeopleDetailPage.tsx    # cluster detail + rename (/people/:id)
 │   ├── StreamPage.tsx          # detail + player + owner actions
 │   ├── StreamsPage.tsx         # catalog, infinite scroll
 │   └── VerifyPage.tsx          # email verification token
@@ -156,6 +163,7 @@ src/
 │   ├── auth.ts                 # login, register, logout, verify/resend
 │   ├── comments.ts             # commentApi (list/create/update/delete)
 │   ├── events.ts               # eventApi (activity feed)
+│   ├── faces.ts                # facesApi (People list/detail/rename)
 │   ├── stats.ts                # statsApi (reactions + views)
 │   ├── streams.ts              # CRUD + upload (single/multipart)
 │   └── users.ts                # whoami, lists (with reauth)
@@ -166,6 +174,10 @@ src/
 │       └── socketMiddleware.ts
 └── types/
     ├── auth.types.ts
+    ├── comment.types.ts
+    ├── event.types.ts
+    ├── face.types.ts
+    ├── stats.types.ts
     ├── stream.types.ts
     └── user.types.ts
 ```
@@ -183,6 +195,8 @@ src/
 | `/verify` | Email verification (token) | public |
 | `/help` | Help guide | public |
 | `/activity` | Activity feed | **authenticated only** |
+| `/people` | People (face clusters) | **authenticated only** |
+| `/people/:clusterId` | People detail + rename | **authenticated only** |
 
 Private routes wrapped in `ProtectedRoute`: no token → redirect to `/`.
 
@@ -254,6 +268,7 @@ Defaults are set in `.env` (local dev) and `Dockerfile` ARGs (Docker/K8s builds)
 | `VITE_EVENTS_URL` | `https://events.example.com` | events.ts (activity feed) |
 | `VITE_COMMENTS_URL` | `https://comments.example.com` | comments.ts (comments section) |
 | `VITE_STATS_URL` | `https://stats.example.com` | stats.ts (reactions + views) |
+| `VITE_FACES_URL` | `https://faces.example.com` | faces.ts (People page) |
 
 To override for Docker builds:
 
@@ -317,6 +332,9 @@ pnpm dev
 
 ## Changelog
 
+- **People («Свои люди»):** Detect Faces button on stream page (owner/admin) +
+  `faces` task chip, `/people` cluster list, `/people/:clusterId` detail with rename,
+  `VITE_FACES_URL` — 2026-09-22;
 - **Help guide:** public `/help` page with topic sections + FAQ, Help link in
   header nav (desktop + mobile) — 2026-09-22;
 - **Location map:** pin in Stream Details opens a dialog with an embedded Leaflet map

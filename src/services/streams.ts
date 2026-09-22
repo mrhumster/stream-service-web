@@ -258,6 +258,16 @@ export const streamApi = createApi({
         { type: "Stream" as const, id: "LIST" },
       ],
     }),
+    processFacesStream: builder.mutation<void, { id: string }>({
+      query: ({ id }) => ({
+        url: `stream/${id}/faces`,
+        method: "POST",
+      }),
+      invalidatesTags: (_res, _err, { id }) => [
+        { type: "Stream" as const, id },
+        { type: "Stream" as const, id: "LIST" },
+      ],
+    }),
   }),
 });
 
@@ -276,4 +286,5 @@ export const {
   usePublishStreamMutation,
   useUnpublishStreamMutation,
   useReprocessStreamMutation,
+  useProcessFacesStreamMutation,
 } = streamApi;

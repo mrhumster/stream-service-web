@@ -6,6 +6,8 @@ import { EditStreamPage } from "./pages/EditStreamPage";
 import { StreamPage } from "./pages/StreamPage";
 import { VerifyPage } from "./pages/VerifyPage";
 import { ActivityPage } from "./pages/ActivityPage";
+import { PeoplePage } from "./pages/PeoplePage";
+import { PeopleDetailPage } from "./pages/PeopleDetailPage";
 import { ProtectedRoute } from "./components/protected-route";
 import { ThemeProvider } from "@/components/theme-provider";
 import { OwnStreamsPage } from "./pages/OwnStreamsPage";
@@ -28,6 +30,8 @@ const router = createBrowserRouter([
           { path: "/streams/create", element: <CreateStreamPage /> },
           { path: "/streams/:id/edit", element: <EditStreamPage /> },
           { path: "/activity", element: <ActivityPage /> },
+          { path: "/people", element: <PeoplePage /> },
+          { path: "/people/:clusterId", element: <PeopleDetailPage /> },
         ],
       },
       { path: "/streams/:id", element: <StreamPage /> },

@@ -38,7 +38,7 @@ export interface StreamStorage {
 }
 
 export interface StreamProcessingTask {
-  task_type: "transcode" | "thumbnail";
+  task_type: "transcode" | "thumbnail" | "faces";
   progress: number;
   steps: string[];
   error: string | null;
