@@ -12,6 +12,7 @@ import type {
   FacesListResponse,
   FaceDetailResponse,
   FaceCluster,
+  FaceCropReplaceResponse,
   StreamFacesResponse,
   RenameFaceRequest,
 } from "../types/face.types.ts";
@@ -77,6 +78,31 @@ export const facesApi = createApi({
       query: (streamId) => `streams/${streamId}/faces`,
       providesTags: (_res, _err, id) => [{ type: "Faces" as const, id }],
     }),
+    getFaceCrop: builder.query<Blob, string>({
+      query: (clusterId) => ({
+        url: `faces/${clusterId}/crop`,
+        responseHandler: (response) => response.blob(),
+      }),
+      providesTags: (_res, _err, id) => [{ type: "Faces" as const, id }],
+    }),
+    replaceFaceCrop: builder.mutation<
+      FaceCropReplaceResponse,
+      { id: string; file: File }
+    >({
+      query: ({ id, file }) => {
+        const form = new FormData();
+        form.append("file", file);
+        return {
+          url: `faces/${id}/crop`,
+          method: "PUT",
+          body: form,
+        };
+      },
+      invalidatesTags: (_res, _err, { id }) => [
+        { type: "Faces" as const, id },
+        { type: "Faces" as const, id: "LIST" },
+      ],
+    }),
   }),
 });
 
@@ -85,4 +111,6 @@ export const {
   useGetFaceQuery,
   useRenameFaceMutation,
   useListStreamFacesQuery,
+  useGetFaceCropQuery,
+  useReplaceFaceCropMutation,
 } = facesApi;

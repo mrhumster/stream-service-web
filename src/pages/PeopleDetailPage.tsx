@@ -1,11 +1,20 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { Loader2, ArrowLeft, Undo, Check, PenSquare } from "lucide-react";
+import {
+  Loader2,
+  ArrowLeft,
+  Undo,
+  Check,
+  PenSquare,
+  Upload,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   useGetFaceQuery,
   useRenameFaceMutation,
+  useReplaceFaceCropMutation,
 } from "@/services/faces";
+import { FaceCrop } from "@/components/faces/face-crop";
 import { cn } from "@/lib/utils";
 
 function formatShortId(id: string) {
@@ -37,11 +46,27 @@ export const PeopleDetailPage = () => {
     skip: !clusterId,
   });
   const [renameFace, { isLoading: renaming }] = useRenameFaceMutation();
+  const [replaceCrop, { isLoading: replacing }] = useReplaceFaceCropMutation();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState<string>("");
 
   const cluster = data?.cluster;
+
+  const onPickFile = async (file: File | null) => {
+    if (!file || !cluster) return;
+    try {
+      await replaceCrop({ id: cluster.id, file }).unwrap();
+      toast.success("Picture updated");
+    } catch (err) {
+      const detail = (err as { data?: { detail?: string } } | undefined)?.data
+        ?.detail;
+      toast.error(detail ? `Failed: ${detail}` : "Failed to update picture");
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const openEditor = () => {
     setName(cluster?.name ?? "");
@@ -85,9 +110,25 @@ export const PeopleDetailPage = () => {
 
       {cluster && !editing && (
         <div className="mb-6 flex flex-wrap items-center gap-3">
+          <FaceCrop
+            clusterId={cluster.id}
+            hasCrop={Boolean(cluster.crop_object)}
+            className="size-16 border-4 border-foreground/30"
+            iconClassName="size-8"
+          />
           <h2 className="text-2xl font-bold uppercase tracking-tighter select-none cursor-default">
             {cluster.is_named ? cluster.name : `Person ${formatShortId(cluster.id)}`}
           </h2>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={replacing}
+            aria-label="Replace picture"
+            className="inline-flex items-center gap-2 border-2 border-black bg-card text-card-foreground hover:bg-accent px-3 py-1.5 text-[10px] uppercase font-bold shadow-[2px_2px_0_0_rgba(0,0,0,0.8)] active:shadow-none active:translate-x-[1px] active:translate-y-[1px] rounded-none disabled:opacity-50"
+          >
+            <Upload className="size-3.5" />
+            {replacing ? "Uploading..." : "Replace picture"}
+          </button>
           <button
             type="button"
             onClick={openEditor}
@@ -97,6 +138,13 @@ export const PeopleDetailPage = () => {
             <PenSquare className="size-3.5" />
             {cluster.is_named ? "Rename" : "Name"}
           </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(e) => void onPickFile(e.target.files?.[0] ?? null)}
+          />
         </div>
       )}
 

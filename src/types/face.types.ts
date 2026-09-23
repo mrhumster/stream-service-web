@@ -9,6 +9,7 @@ export interface FaceCluster {
   name: string | null;
   is_named: boolean;
   sample_count: number;
+  crop_object?: string | null;
   created_at: string;
   updated_at: string;
   video_count?: number;
@@ -45,4 +46,9 @@ export interface StreamFacesResponse {
 
 export interface RenameFaceRequest {
   name: string | null;
+}
+
+export interface FaceCropReplaceResponse {
+  cluster: FaceCluster;
+  crop_object: string;
 }
