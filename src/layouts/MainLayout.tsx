@@ -31,7 +31,9 @@ export const MainLayout = () => {
   const [isRegister, setIsRegister] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const auth = useAuth();
-  const { data } = useGetAuthUserQuery(undefined, { skip: !auth.isAuth });
+  const { data } = useGetAuthUserQuery(undefined, {
+    skip: !auth.isAuth && !auth.isInitializing,
+  });
   const [logout] = useLogoutMutation();
   const dispatch = useAppDispatch();
   const { autoplay, theme: themeSetting } = useAppSelector((s) => s.settings);
