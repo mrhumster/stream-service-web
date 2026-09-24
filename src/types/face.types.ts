@@ -48,6 +48,20 @@ export interface RenameFaceRequest {
   name: string | null;
 }
 
+export interface MergeFacesRequest {
+  cluster_ids: string[];
+}
+
+export interface MergeFacesResponse {
+  cluster: FaceCluster;
+  merged_ids: string[];
+  target_id: string;
+}
+
+export interface DeleteFaceResponse {
+  cluster_id: string;
+}
+
 export interface FaceCropReplaceResponse {
   cluster: FaceCluster;
   crop_object: string;

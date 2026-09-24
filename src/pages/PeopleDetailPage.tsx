@@ -7,15 +7,31 @@ import {
   Check,
   PenSquare,
   Upload,
+  Delete,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   useGetFaceQuery,
   useRenameFaceMutation,
   useReplaceFaceCropMutation,
+  useDeleteFaceMutation,
 } from "@/services/faces";
 import { FaceCrop } from "@/components/faces/face-crop";
 import { cn } from "@/lib/utils";
+
+const pixelBtnOutline =
+  "inline-flex items-center justify-center gap-2 bg-card text-card-foreground hover:bg-accent border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold";
+
+const pixelBtnDestructive =
+  "inline-flex items-center justify-center gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold";
 
 function formatShortId(id: string) {
   return id.slice(0, 8);
@@ -47,10 +63,12 @@ export const PeopleDetailPage = () => {
   });
   const [renameFace, { isLoading: renaming }] = useRenameFaceMutation();
   const [replaceCrop, { isLoading: replacing }] = useReplaceFaceCropMutation();
+  const [deleteFace, { isLoading: deleting }] = useDeleteFaceMutation();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState<string>("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const cluster = data?.cluster;
 
@@ -137,6 +155,15 @@ export const PeopleDetailPage = () => {
           >
             <PenSquare className="size-3.5" />
             {cluster.is_named ? "Rename" : "Name"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(true)}
+            aria-label="Delete person"
+            className="inline-flex items-center gap-2 border-2 border-black bg-destructive text-destructive-foreground hover:bg-destructive/90 px-3 py-1.5 text-[10px] uppercase font-bold shadow-[2px_2px_0_0_rgba(0,0,0,0.8)] active:shadow-none active:translate-x-[1px] active:translate-y-[1px] rounded-none"
+          >
+            <Delete className="size-3.5" />
+            Delete
           </button>
           <input
             ref={fileInputRef}
@@ -253,6 +280,53 @@ export const PeopleDetailPage = () => {
           ))}
         </ul>
       )}
+
+      <Dialog
+        open={confirmDelete}
+        onOpenChange={(open) => !open && setConfirmDelete(false)}
+      >
+        <DialogContent className="border-4 border-primary shadow-[8px_8px_0_0_rgba(0,0,0,1)] rounded-none max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-sm uppercase tracking-wider">
+              Delete person?
+            </DialogTitle>
+            <DialogDescription className="text-xs uppercase tracking-wider">
+              {cluster?.sample_count} sample{cluster?.sample_count === 1 ? "" : "s"} ·{" "}
+              {data?.videos.length ?? 0} stream{data?.videos.length === 1 ? "" : "s"} ·
+              This action cannot be undone and allows re-detection.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              type="button"
+              className={pixelBtnOutline}
+              onClick={() => setConfirmDelete(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className={pixelBtnDestructive}
+              disabled={deleting}
+              onClick={async () => {
+                if (!cluster) return;
+                try {
+                  await deleteFace(cluster.id).unwrap();
+                  setConfirmDelete(false);
+                  toast.success("Person deleted");
+                  navigate("/people");
+                } catch (err) {
+                  const detail = (err as { data?: { detail?: string } } | undefined)
+                    ?.data?.detail;
+                  toast.error(detail ? `Failed: ${detail}` : "Failed to delete person");
+                }
+              }}
+            >
+              {deleting ? "Deleting..." : "Delete"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

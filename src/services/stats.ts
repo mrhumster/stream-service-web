@@ -21,6 +21,12 @@ const baseQuery = fetchBaseQuery({
   },
 });
 
+const refreshBaseQuery = fetchBaseQuery({
+  baseUrl: import.meta.env.VITE_API_URL as string,
+  credentials: "include",
+  timeout: 30000,
+});
+
 const baseQueryWithReauth: BaseQueryFn<
   string | FetchArgs,
   unknown,
@@ -29,7 +35,7 @@ const baseQueryWithReauth: BaseQueryFn<
   let result = await baseQuery(args, api, extraOptions);
 
   if (result.error && result.error.status === 401) {
-    const refreshResult = await baseQuery(
+    const refreshResult = await refreshBaseQuery(
       { url: "auth/refresh", method: "POST" },
       api,
       extraOptions,

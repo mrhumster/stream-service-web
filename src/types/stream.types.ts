@@ -64,6 +64,7 @@ export interface StreamResponse {
   updated_at: string;
   published_at: string | null;
   processing: StreamProcessingTask[];
+  faces_detected?: boolean;
 }
 
 export interface StreamListParams {

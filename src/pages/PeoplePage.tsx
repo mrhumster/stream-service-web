@@ -1,8 +1,27 @@
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Loader2, Sparkles, Copy } from "lucide-react";
-import { useListFacesQuery } from "@/services/faces";
+import { Loader2, Sparkles, Copy, Delete, Merge } from "lucide-react";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useListFacesQuery, useDeleteFaceMutation, useMergeFacesMutation } from "@/services/faces";
 import { FaceCrop } from "@/components/faces/face-crop";
 import type { FacesListResponse } from "@/types/face.types";
+
+const pixelBtnOutline =
+  "inline-flex items-center justify-center gap-2 bg-card text-card-foreground hover:bg-accent border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold";
+
+const pixelBtn =
+  "inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold";
+
+const pixelBtnDestructive =
+  "inline-flex items-center justify-center gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold";
 
 function formatShortId(id: string) {
   return id.slice(0, 8);
@@ -55,10 +74,95 @@ function collapseDuplicates(
 
 export const PeoplePage = () => {
   const { data, isLoading, error } = useListFacesQuery();
+  const [deleteFace, { isLoading: deleting }] = useDeleteFaceMutation();
+  const [mergeFaces, { isLoading: merging }] = useMergeFacesMutation();
+
+  const [mergeMode, setMergeMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleteTarget, setDeleteTarget] = useState<
+    FacesListResponse["clusters"][number] | null
+  >(null);
+  const [confirmMerge, setConfirmMerge] = useState(false);
 
   const clusters: FacesListResponse["clusters"] | undefined = data?.clusters;
   const rows =
-    clusters && clusters.length > 0 ? collapseDuplicates(clusters) : [];
+    clusters && clusters.length > 0
+      ? mergeMode
+        ? clusters.map((c) => ({ cluster: c, similar: 0 }))
+        : collapseDuplicates(clusters)
+      : [];
+
+  const deleteTargets: FacesListResponse["clusters"] = useMemo(() => {
+    if (!deleteTarget) return [];
+    if (deleteTarget.is_named && deleteTarget.name !== null) {
+      // Deleting a collapsed (duplicate) person removes every cluster with the same name.
+      const sameName = (clusters ?? []).filter(
+        (c) => c.name === deleteTarget.name,
+      );
+      if (sameName.length > 1) return sameName;
+    }
+    return [deleteTarget];
+  }, [deleteTarget, clusters]);
+
+  const deleteSamples = useMemo(
+    () => deleteTargets.reduce((sum, c) => sum + c.sample_count, 0),
+    [deleteTargets],
+  );
+  const deleteStreams = useMemo(
+    () =>
+      new Set(
+        deleteTargets.flatMap((c) => (c.videos ?? []).map((v) => v.stream_id)),
+      ).size,
+    [deleteTargets],
+  );
+
+  const sortedSelected = useMemo(
+    () => [...selected].sort(),
+    [selected],
+  );
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const runDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      for (const c of deleteTargets) {
+        await deleteFace(c.id).unwrap();
+      }
+      toast.success("Person deleted");
+      setDeleteTarget(null);
+    } catch (err) {
+      const detail = (err as { data?: { detail?: string } } | undefined)?.data
+        ?.detail;
+      toast.error(detail ? `Failed: ${detail}` : "Failed to delete person");
+    }
+  };
+
+  const runMerge = async () => {
+    if (sortedSelected.length < 2) return;
+    try {
+      const res = await mergeFaces({
+        cluster_ids: sortedSelected,
+      }).unwrap();
+      toast.success(
+        `Merged into ${res.cluster.is_named ? res.cluster.name : "person"}`,
+      );
+      setSelected(new Set());
+      setConfirmMerge(false);
+      setMergeMode(false);
+    } catch (err) {
+      const detail = (err as { data?: { detail?: string } } | undefined)?.data
+        ?.detail;
+      toast.error(detail ? `Failed: ${detail}` : "Failed to merge people");
+    }
+  };
 
   return (
     <div>
@@ -66,13 +170,45 @@ export const PeoplePage = () => {
         <h2 className="text-2xl font-bold uppercase tracking-tighter select-none cursor-default">
           People
         </h2>
-        {data?.total !== undefined && (
-          <span className="text-[10px] uppercase font-bold text-muted-foreground">
-            {data.total} cluster{data.total === 1 ? "" : "s"} · {rows.length}{" "}
-            shown
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {data?.total !== undefined && (
+            <span className="text-[10px] uppercase font-bold text-muted-foreground">
+              {data.total} cluster{data.total === 1 ? "" : "s"} · {rows.length}{" "}
+              shown
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              setMergeMode((m) => !m);
+              setSelected(new Set());
+            }}
+            aria-label={mergeMode ? "Exit merge mode" : "Merge mode"}
+            className="inline-flex items-center gap-2 border-2 border-black bg-card text-card-foreground hover:bg-accent px-3 py-1.5 text-[10px] uppercase font-bold shadow-[2px_2px_0_0_rgba(0,0,0,0.8)] active:shadow-none active:translate-x-[1px] active:translate-y-[1px] rounded-none"
+          >
+            <Merge className="size-3.5" />
+            {mergeMode ? "Cancel" : "Merge"}
+          </button>
+        </div>
       </div>
+
+      {mergeMode && (
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <span className="text-[10px] uppercase font-bold text-muted-foreground">
+            {sortedSelected.length} selected
+          </span>
+          <button
+            type="button"
+            disabled={sortedSelected.length < 2 || merging}
+            onClick={() => setConfirmMerge(true)}
+            aria-label="Merge selected people"
+            className={pixelBtn}
+          >
+            <Merge className="size-3.5" />
+            {merging ? "Merging..." : `Merge ${sortedSelected.length}`}
+          </button>
+        </div>
+      )}
 
       {isLoading && (
         <div className="flex justify-center py-12">
@@ -95,10 +231,23 @@ export const PeoplePage = () => {
       {rows.length > 0 && (
         <ul className="flex flex-col gap-2">
           {rows.map(({ cluster: c, similar }) => (
-            <li key={c.id}>
+            <li
+              key={c.id}
+              className="flex items-center gap-2 border-4 bg-card text-foreground hover:bg-accent border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none px-4 py-3 transition-colors"
+            >
+              {mergeMode && (
+                <label className="inline-flex items-center shrink-0 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(c.id)}
+                    onChange={() => toggle(c.id)}
+                    className="size-4 accent-[#ffcc00]"
+                  />
+                </label>
+              )}
               <Link
                 to={`/people/${c.id}`}
-                className="w-full flex items-center gap-3 border-4 bg-card text-foreground hover:bg-accent border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none px-4 py-3 transition-colors"
+                className="flex-1 min-w-0 flex items-center gap-3"
               >
                 <FaceCrop clusterId={c.id} hasCrop={Boolean(c.crop_object)} />
                 <span className="flex-1 min-w-0">
@@ -119,12 +268,89 @@ export const PeoplePage = () => {
                     {similar} similar
                   </span>
                 )}
-                <Sparkles className="size-4 text-muted-foreground shrink-0" />
               </Link>
+              <Sparkles className="size-4 text-muted-foreground shrink-0" />
+              {!mergeMode && (
+                <button
+                  type="button"
+                  onClick={() => setDeleteTarget(c)}
+                  aria-label="Delete person"
+                  className="inline-flex items-center justify-center size-8 border-2 border-black bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-[2px_2px_0_0_rgba(0,0,0,0.8)] active:shadow-none active:translate-x-[1px] active:translate-y-[1px] rounded-none"
+                >
+                  <Delete className="size-4" />
+                </button>
+              )}
             </li>
           ))}
         </ul>
       )}
+
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+      >
+        <DialogContent className="border-4 border-primary shadow-[8px_8px_0_0_rgba(0,0,0,1)] rounded-none max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-sm uppercase tracking-wider">
+              Delete person?
+            </DialogTitle>
+            <DialogDescription className="text-xs uppercase tracking-wider">
+              This will remove {deleteSamples} sample
+              {deleteSamples === 1 ? "" : "s"} from {deleteStreams} stream
+              {deleteStreams === 1 ? "" : "s"} and allow re-detection.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              type="button"
+              className={pixelBtnOutline}
+              onClick={() => setDeleteTarget(null)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className={pixelBtnDestructive}
+              disabled={deleting}
+              onClick={() => void runDelete()}
+            >
+              {deleting ? "Deleting..." : "Delete"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={confirmMerge} onOpenChange={setConfirmMerge}>
+        <DialogContent className="border-4 border-primary shadow-[8px_8px_0_0_rgba(0,0,0,1)] rounded-none max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-sm uppercase tracking-wider">
+              Merge {sortedSelected.length} people?
+            </DialogTitle>
+            <DialogDescription className="text-xs uppercase tracking-wider">
+              All face samples will be moved into one cluster. The merged person
+              keeps the name of the first selected named person. This cannot be
+              undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              type="button"
+              className={pixelBtnOutline}
+              onClick={() => setConfirmMerge(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className={pixelBtn}
+              disabled={merging}
+              onClick={() => void runMerge()}
+            >
+              {merging ? "Merging..." : "Merge"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

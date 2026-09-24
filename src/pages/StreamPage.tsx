@@ -44,15 +44,16 @@ import { StreamSidebar } from "@/components/stream-sidebar";
 import type { StreamProcessingTask } from "@/types/stream.types";
 import { CommentsSection } from "@/components/comments/comments-section";
 import { ShareButton } from "@/components/stream/share-button";
+import { PeopleBlock } from "@/components/faces/people-block";
 
 const pixelBtn =
-  "inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold";
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold";
 
 const pixelBtnOutline =
-  "inline-flex items-center justify-center gap-2 bg-card text-card-foreground hover:bg-accent border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold";
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap bg-card text-card-foreground hover:bg-accent border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold";
 
 const pixelBtnDestructive =
-  "inline-flex items-center justify-center gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold";
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap bg-destructive text-destructive-foreground hover:bg-destructive/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold";
 
 const taskLabels: Record<StreamProcessingTask["task_type"], string> = {
   transcode: "Transcoding",
@@ -202,7 +203,7 @@ export const StreamPage = () => {
                       onClick={handleReprocess}
                       disabled={isReprocessing}
                       aria-label={isReprocessing ? "Reprocessing..." : "Reprocess"}
-                      className="cursor-pointer inline-flex items-center justify-center min-w-9 gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-3 sm:px-4 font-bold disabled:opacity-50"
+                      className="cursor-pointer inline-flex items-center justify-center min-w-9 gap-2 whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-3 sm:px-4 font-bold disabled:opacity-50"
                     >
                       <Reload className="size-5" />
                       <span className="hidden md:inline">
@@ -287,26 +288,28 @@ export const StreamPage = () => {
               <Link
                 to={`/streams/${stream.id}/edit`}
                 aria-label="Update Stream"
-                className="inline-flex items-center justify-center min-w-9 gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-3 sm:px-4 font-bold"
+                className="inline-flex items-center justify-center min-w-9 gap-2 whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-3 sm:px-4 font-bold"
               >
                 <PenSquare className="size-5" />
                 <span className="hidden md:inline">Update Stream</span>
               </Link>
               )}
               {isReady || isPublish ? (
+                !stream.faces_detected ? (
                 <button
                   disabled={isProcessingFaces}
                   onClick={handleProcessFaces}
                   aria-label={
                     isProcessingFaces ? "Detecting faces..." : "Detect Faces"
                   }
-                  className="cursor-pointer inline-flex items-center justify-center min-w-9 gap-2 bg-card text-card-foreground hover:bg-accent border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-3 sm:px-4 font-bold disabled:opacity-50"
+                  className="cursor-pointer inline-flex items-center justify-center min-w-9 gap-2 whitespace-nowrap bg-card text-card-foreground hover:bg-accent border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-3 sm:px-4 font-bold disabled:opacity-50"
                 >
                   <User className="size-5" />
                   <span className="hidden md:inline">
                     {isProcessingFaces ? "Detecting faces..." : "Detect Faces"}
                   </span>
                 </button>
+                ) : null
               ) : null}
               </>
               )}
@@ -315,7 +318,7 @@ export const StreamPage = () => {
                   disabled={isPublish || isPublished}
                   onClick={() => setConfirmAction("publish")}
                   aria-label="Publish"
-                  className="cursor-pointer inline-flex items-center justify-center min-w-9 gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-3 sm:px-4 font-bold"
+                  className="cursor-pointer inline-flex items-center justify-center min-w-9 gap-2 whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-3 sm:px-4 font-bold"
                 >
                   <Globe className="size-5" />
                   <span className="hidden md:inline">Publish</span>
@@ -326,7 +329,7 @@ export const StreamPage = () => {
                   disabled={isUnpublished}
                   onClick={() => setConfirmAction("unpublish")}
                   aria-label="Unpublish"
-                  className="cursor-pointer inline-flex items-center justify-center min-w-9 gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-3 sm:px-4 font-bold"
+                  className="cursor-pointer inline-flex items-center justify-center min-w-9 gap-2 whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-3 sm:px-4 font-bold"
                 >
                   <Globe className="size-5" />
                   <span className="hidden md:inline">Unpublish</span>
@@ -336,7 +339,7 @@ export const StreamPage = () => {
                 disabled={isDeleting}
                 onClick={() => setConfirmAction("delete")}
                 aria-label={isDeleting ? "Deleting..." : "Delete Stream"}
-                className="cursor-pointer inline-flex items-center justify-center min-w-9 gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-3 sm:px-4 font-bold disabled:opacity-50"
+                className="cursor-pointer inline-flex items-center justify-center min-w-9 gap-2 whitespace-nowrap bg-destructive text-destructive-foreground hover:bg-destructive/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-3 sm:px-4 font-bold disabled:opacity-50"
               >
                 <Delete className="size-5" />
                 <span className="hidden md:inline">
@@ -529,6 +532,8 @@ export const StreamPage = () => {
               </span>
             </CardFooter>
           </Card>
+
+          {isOwner && stream.faces_detected && <PeopleBlock streamId={id!} />}
 
           {coords && (
             <Dialog open={mapOpen} onOpenChange={setMapOpen}>

@@ -159,7 +159,7 @@ function EditStreamForm({ stream }: { stream: StreamResponse }) {
       <Button
         type="submit"
         disabled={isUpdating || !title.trim()}
-        className="w-full bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-12"
+        className="w-full whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-12"
       >
         {isUpdating ? "Updating..." : "Update Stream"}
       </Button>

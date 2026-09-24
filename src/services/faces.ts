@@ -7,6 +7,7 @@ import {
 } from "@reduxjs/toolkit/query/react";
 import { type RootState } from "../store/store.ts";
 import { eraseAuth, tokenReceived } from "../feature/auth/authSlice";
+import { streamApi } from "./streams.ts";
 import type { LoginResponse } from "../types/auth.types.ts";
 import type {
   FacesListResponse,
@@ -15,6 +16,9 @@ import type {
   FaceCropReplaceResponse,
   StreamFacesResponse,
   RenameFaceRequest,
+  MergeFacesRequest,
+  MergeFacesResponse,
+  DeleteFaceResponse,
 } from "../types/face.types.ts";
 
 const baseQuery = fetchBaseQuery({
@@ -28,6 +32,12 @@ const baseQuery = fetchBaseQuery({
   },
 });
 
+const refreshBaseQuery = fetchBaseQuery({
+  baseUrl: import.meta.env.VITE_API_URL as string,
+  credentials: "include",
+  timeout: 30000,
+});
+
 const baseQueryWithReauth: BaseQueryFn<
   string | FetchArgs,
   unknown,
@@ -36,7 +46,7 @@ const baseQueryWithReauth: BaseQueryFn<
   let result = await baseQuery(args, api, extraOptions);
 
   if (result.error && result.error.status === 401) {
-    const refreshResult = await baseQuery(
+    const refreshResult = await refreshBaseQuery(
       { url: "auth/refresh", method: "POST" },
       api,
       extraOptions,
@@ -57,7 +67,7 @@ export const facesApi = createApi({
   endpoints: (builder) => ({
     listFaces: builder.query<FacesListResponse, void>({
       query: () => "faces",
-      providesTags: ["Faces"],
+      providesTags: () => [{ type: "Faces" as const, id: "LIST" }],
     }),
     getFace: builder.query<FaceDetailResponse, string>({
       query: (clusterId) => `faces/${clusterId}`,
@@ -76,7 +86,10 @@ export const facesApi = createApi({
     }),
     listStreamFaces: builder.query<StreamFacesResponse, string>({
       query: (streamId) => `streams/${streamId}/faces`,
-      providesTags: (_res, _err, id) => [{ type: "Faces" as const, id }],
+      providesTags: (_res, _err, streamId) => [
+        { type: "Faces" as const, id: streamId },
+        { type: "Faces" as const, id: "LIST" },
+      ],
     }),
     getFaceCrop: builder.query<Blob, string>({
       query: (clusterId) => ({
@@ -103,6 +116,43 @@ export const facesApi = createApi({
         { type: "Faces" as const, id: "LIST" },
       ],
     }),
+    deleteFace: builder.mutation<DeleteFaceResponse, string>({
+      query: (clusterId) => ({
+        url: `faces/${clusterId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (_res, _err, clusterId) => [
+        { type: "Faces" as const, id: clusterId },
+        { type: "Faces" as const, id: "LIST" },
+      ],
+      async onQueryStarted(_clusterId, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          dispatch(streamApi.util.invalidateTags(["Stream"]));
+        } catch {
+          // nothing to roll back
+        }
+      },
+    }),
+    mergeFaces: builder.mutation<MergeFacesResponse, MergeFacesRequest>({
+      query: (body) => ({
+        url: "faces/merge",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_res, _err, { cluster_ids }) => [
+        { type: "Faces" as const, id: "LIST" },
+        ...cluster_ids.map((id) => ({ type: "Faces" as const, id })),
+      ],
+      async onQueryStarted(_args, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          dispatch(streamApi.util.invalidateTags(["Stream"]));
+        } catch {
+          // nothing to roll back
+        }
+      },
+    }),
   }),
 });
 
@@ -113,4 +163,6 @@ export const {
   useListStreamFacesQuery,
   useGetFaceCropQuery,
   useReplaceFaceCropMutation,
+  useDeleteFaceMutation,
+  useMergeFacesMutation,
 } = facesApi;
