@@ -1,4 +1,11 @@
-import { useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { Link } from "react-router-dom";
 import { Loader2, Sparkles, Copy, Delete, Merge, Users as UsersIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -10,15 +17,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useListFacesQuery, useDeleteFaceMutation, useMergeFacesMutation } from "@/services/faces";
-import { FaceCrop } from "@/components/faces/face-crop";
 import {
-  buildSimilarityGroups,
-  formatPercent,
-  SIMILARITY_THRESHOLD,
-  type SimilarityGroup,
-} from "@/lib/face-similarity";
-import type { FacesListResponse } from "@/types/face.types";
+  useListFacesQuery,
+  useDeleteFaceMutation,
+  useMergeFacesMutation,
+  useDeleteEmptyFacesMutation,
+} from "@/services/faces";
+import { FaceCrop } from "@/components/faces/face-crop";
+import { formatPercent, SIMILARITY_THRESHOLD } from "@/lib/face-similarity";
+import type {
+  FaceClusterWithStats,
+  FacesListResponse,
+  SimilarityGroup,
+} from "@/types/face.types";
+
+const PAGE_SIZE = 50;
 
 const pixelBtnOutline =
   "inline-flex items-center justify-center gap-2 bg-card text-card-foreground hover:bg-accent border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold";
@@ -78,7 +91,7 @@ function collapseDuplicates(
   });
 }
 
-type Person = FacesListResponse["clusters"][number];
+type Person = FaceClusterWithStats;
 
 interface PersonRowProps {
   person: Person;
@@ -184,7 +197,7 @@ function SimilarGroupCard({
         simLabel={formatPercent(group.maxSim)}
         onDelete={onDelete}
       >
-        {mergeMode && (
+{mergeMode && (
           <button
             type="button"
             onClick={() => onSelectAll(group)}
@@ -215,21 +228,27 @@ function SimilarGroupCard({
 }
 
 export const PeoplePage = () => {
-  const { data, isLoading, error } = useListFacesQuery();
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const [offset, setOffset] = useState(0);
+
+  const { data, isLoading, isFetching, error } = useListFacesQuery({
+    limit: PAGE_SIZE,
+    offset,
+  });
   const [deleteFace, { isLoading: deleting }] = useDeleteFaceMutation();
   const [mergeFaces, { isLoading: merging }] = useMergeFacesMutation();
+  const [deleteEmptyFaces, { isLoading: deletingEmpty }] =
+    useDeleteEmptyFacesMutation();
 
   const [mergeMode, setMergeMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleteTarget, setDeleteTarget] = useState<Person | null>(null);
   const [confirmMerge, setConfirmMerge] = useState(false);
+  const [confirmDeleteEmpty, setConfirmDeleteEmpty] = useState(false);
 
   const clusters: FacesListResponse["clusters"] | undefined = data?.clusters;
 
-  const groups = useMemo(
-    () => (clusters ? buildSimilarityGroups(clusters) : []),
-    [clusters],
-  );
+  const groups = useMemo(() => data?.groups ?? [], [data]);
 
   const groupIds = useMemo(() => {
     const ids = new Set<string>();
@@ -254,6 +273,29 @@ export const PeoplePage = () => {
 
   const shownCount =
     rows.length + groups.reduce((sum, g) => sum + 1 + g.members.length, 0);
+
+  const hasMore = data ? data.clusters.length < data.rest_total : false;
+
+  const loadMore = useCallback(() => {
+    if (!isFetching && hasMore && data) {
+      setOffset(data.clusters.length);
+    }
+  }, [isFetching, hasMore, data]);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) loadMore();
+      },
+      { threshold: 0.1 },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [loadMore]);
 
   const deleteTargets: Person[] = useMemo(() => {
     if (!deleteTarget) return [];
@@ -311,6 +353,7 @@ export const PeoplePage = () => {
       }
       toast.success("Person deleted");
       setDeleteTarget(null);
+      setOffset(0);
     } catch (err) {
       const detail = (err as { data?: { detail?: string } } | undefined)?.data
         ?.detail;
@@ -330,10 +373,30 @@ export const PeoplePage = () => {
       setSelected(new Set());
       setConfirmMerge(false);
       setMergeMode(false);
+      setOffset(0);
     } catch (err) {
       const detail = (err as { data?: { detail?: string } } | undefined)?.data
         ?.detail;
       toast.error(detail ? `Failed: ${detail}` : "Failed to merge people");
+    }
+  };
+
+  const runDeleteEmpty = async () => {
+    try {
+      const res = await deleteEmptyFaces().unwrap();
+      toast.success(
+        `Deleted ${res.deleted} empty ${res.deleted === 1 ? "person" : "persons"}`,
+      );
+      setConfirmDeleteEmpty(false);
+      setOffset(0);
+    } catch (err) {
+      const detail = (err as { data?: { detail?: string } } | undefined)?.data
+        ?.detail;
+      toast.error(
+        detail
+          ? `Failed: ${detail}`
+          : "Failed to delete empty persons",
+      );
     }
   };
 
@@ -365,8 +428,29 @@ export const PeoplePage = () => {
         </div>
       </div>
 
+      {data && data.empty_count > 0 && (
+        <div className="flex flex-wrap items-center gap-3 mb-4 border-2 border-dashed border-muted-foreground/50 bg-card px-4 py-3 rounded-none">
+          <span className="text-[10px] uppercase font-bold text-muted-foreground">
+            {data.empty_count} empty person{" "}
+            {data.empty_count === 1 ? "hidden" : "s hidden"} — 0 samples, 0
+            videos
+          </span>
+          <button
+            type="button"
+            disabled={deletingEmpty}
+            onClick={() => setConfirmDeleteEmpty(true)}
+            className={pixelBtnDestructive}
+          >
+            <Delete className="size-3.5" />
+            {deletingEmpty
+              ? "Deleting..."
+              : `Delete ${data.empty_count} empty ${data.empty_count === 1 ? "person" : "persons"}`}
+          </button>
+        </div>
+      )}
+
       {mergeMode && (
-        <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 mb-4 px-2 py-2 bg-card border-4 border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
           <span className="text-[10px] uppercase font-bold text-muted-foreground">
             {sortedSelected.length} selected
           </span>
@@ -395,7 +479,7 @@ export const PeoplePage = () => {
         </p>
       )}
 
-      {data && clusters && clusters.length === 0 && (
+      {data && data.clusters.length === 0 && groups.length === 0 && (
         <p className="text-center text-muted-foreground text-sm uppercase font-bold py-12">
           No faces detected yet
         </p>
@@ -505,6 +589,47 @@ export const PeoplePage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    <Dialog open={confirmDeleteEmpty} onOpenChange={setConfirmDeleteEmpty}>
+        <DialogContent className="border-4 border-primary shadow-[8px_8px_0_0_rgba(0,0,0,1)] rounded-none max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-sm uppercase tracking-wider">
+              Delete {data?.empty_count ?? 0} empty{" "}
+              {(data?.empty_count ?? 0) === 1 ? "person" : "persons"}?
+            </DialogTitle>
+            <DialogDescription className="text-xs uppercase tracking-wider">
+              These clusters have no face samples attached — nothing is
+              re-detected and no stream is affected. The action is immediate
+              and cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              type="button"
+              className={pixelBtnOutline}
+              onClick={() => setConfirmDeleteEmpty(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className={pixelBtnDestructive}
+              disabled={deletingEmpty}
+              onClick={() => void runDeleteEmpty()}
+            >
+              {deletingEmpty ? "Deleting..." : "Delete"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Sentinel for IntersectionObserver */}
+      <div ref={sentinelRef} className="h-1" />
+
+      {isFetching && !isLoading && data && data.clusters.length > 0 && (
+        <div className="flex justify-center py-6">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      )}
     </div>
   );
 };

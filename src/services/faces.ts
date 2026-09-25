@@ -19,6 +19,8 @@ import type {
   MergeFacesRequest,
   MergeFacesResponse,
   DeleteFaceResponse,
+  DeleteEmptyFacesResponse,
+  FaceListParams,
 } from "../types/face.types.ts";
 
 const baseQuery = fetchBaseQuery({
@@ -117,8 +119,29 @@ export const facesApi = createApi({
   baseQuery: baseQueryWithReauth,
   tagTypes: ["Faces"],
   endpoints: (builder) => ({
-    listFaces: builder.query<FacesListResponse, void>({
-      query: () => "faces",
+    listFaces: builder.query<FacesListResponse, FaceListParams>({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        searchParams.set("limit", String(params.limit ?? 50));
+        searchParams.set("offset", String(params.offset ?? 0));
+        return `faces?${searchParams.toString()}`;
+      },
+      serializeQueryArgs: ({ endpointName, queryArgs }) => {
+        const { limit } = queryArgs ?? {};
+        return `${endpointName}:${JSON.stringify({ limit })}`;
+      },
+      merge: (currentCache, newItems) => {
+        if (newItems.offset === 0) return newItems;
+        // Dedupe by id: an invalidation refetch may race an in-flight page load
+        // and append clusters that were already present.
+        const seen = new Set<string>();
+        const clusters = [...currentCache.clusters, ...newItems.clusters].filter(
+          (c) => (seen.has(c.id) ? false : (seen.add(c.id), true)),
+        );
+        return { ...newItems, clusters };
+      },
+      forceRefetch: ({ currentArg, previousArg }) =>
+        currentArg?.offset !== previousArg?.offset,
       providesTags: () => [{ type: "Faces" as const, id: "LIST" }],
     }),
     getFace: builder.query<FaceDetailResponse, string>({
@@ -205,6 +228,13 @@ export const facesApi = createApi({
         }
       },
     }),
+    deleteEmptyFaces: builder.mutation<DeleteEmptyFacesResponse, void>({
+      query: () => ({
+        url: "faces/delete-empty",
+        method: "POST",
+      }),
+      invalidatesTags: () => [{ type: "Faces" as const, id: "LIST" }],
+    }),
   }),
 });
 
@@ -217,4 +247,5 @@ export const {
   useReplaceFaceCropMutation,
   useDeleteFaceMutation,
   useMergeFacesMutation,
+  useDeleteEmptyFacesMutation,
 } = facesApi;

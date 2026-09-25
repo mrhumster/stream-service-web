@@ -24,9 +24,39 @@ export interface FaceOccurrence {
   created_at: string;
 }
 
+export type FaceClusterWithStats = FaceCluster & {
+  video_count: number;
+  videos: FaceClusterVideo[];
+};
+
+export interface SimilarMember<T extends FaceCluster = FaceCluster> {
+  cluster: T;
+  sim: number;
+}
+
+export interface SimilarityGroup<T extends FaceCluster = FaceCluster> {
+  rep: T;
+  members: SimilarMember<T>[];
+  maxSim: number;
+}
+
+export interface FaceListParams {
+  limit?: number;
+  offset?: number;
+}
+
 export interface FacesListResponse {
-  clusters: (FaceCluster & { video_count: number; videos: FaceClusterVideo[] })[];
+  clusters: FaceClusterWithStats[];
+  groups: SimilarityGroup<FaceClusterWithStats>[];
   total: number;
+  empty_count: number;
+  rest_total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface DeleteEmptyFacesResponse {
+  deleted: number;
 }
 
 export interface FaceDetailResponse {
