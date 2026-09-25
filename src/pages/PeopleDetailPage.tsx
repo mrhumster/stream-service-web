@@ -9,6 +9,8 @@ import {
   Upload,
   Delete,
   Merge,
+  ChevronDown,
+  Image as ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -29,6 +31,7 @@ import {
 } from "@/services/faces";
 import { FaceCrop } from "@/components/faces/face-crop";
 import { cn } from "@/lib/utils";
+import { thumbnailUrl } from "@/lib/stream-format";
 
 const pixelBtnOutline =
   "inline-flex items-center justify-center gap-2 bg-card text-card-foreground hover:bg-accent border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold";
@@ -55,6 +58,50 @@ function formatSeconds(s: number) {
   const m = Math.floor(total / 60);
   const sec = total % 60;
   return `${m}:${sec.toString().padStart(2, "0")}`;
+}
+
+function StreamPreviewCard({
+  streamId,
+  count,
+}: {
+  streamId: string;
+  count: number;
+}) {
+  const [broken, setBroken] = useState(false);
+
+  return (
+    <Link
+      to={`/streams/${streamId}`}
+      className="block border-2 border-foreground/20 bg-card shadow-[2px_2px_0_0_rgba(0,0,0,0.3)] transition-colors hover:border-primary rounded-none overflow-hidden"
+    >
+      <div className="relative aspect-square bg-muted border-b-2 border-foreground/10">
+        {broken ? (
+          <div className="flex h-full flex-col items-center justify-center gap-2">
+            <ImageIcon className="size-6 text-muted-foreground/60" />
+            <span className="text-[9px] uppercase tracking-wider text-muted-foreground/60">
+              No Preview
+            </span>
+          </div>
+        ) : (
+          <img
+            src={thumbnailUrl(streamId)}
+            alt=""
+            loading="lazy"
+            className="size-full object-cover"
+            onError={() => setBroken(true)}
+          />
+        )}
+        <span className="absolute bottom-1.5 right-1.5 z-10 bg-black/80 px-1.5 py-0.5 text-[8px] font-['Press_Start_2P'] text-white uppercase tracking-wider">
+          {count} frame{count === 1 ? "" : "s"}
+        </span>
+      </div>
+      <div className="px-2.5 py-2">
+        <span className="block text-[10px] uppercase font-bold text-muted-foreground tracking-tight truncate">
+          stream/{streamId.slice(0, 8)}
+        </span>
+      </div>
+    </Link>
+  );
 }
 
 export const PeopleDetailPage = () => {
@@ -303,21 +350,15 @@ export const PeopleDetailPage = () => {
           <h3 className="text-xs uppercase font-bold tracking-tight mb-2">
             Videos
           </h3>
-          <ul className="flex flex-col gap-1.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {data.videos.map((v) => (
-              <li key={v.stream_id}>
-                <Link
-                  to={`/streams/${v.stream_id}`}
-                  className="inline-flex items-center gap-2 text-[10px] uppercase font-bold text-muted-foreground hover:text-primary underline underline-offset-2"
-                >
-                  stream/{v.stream_id.slice(0, 8)}
-                  <span className="text-primary">
-                    {v.count} frame{v.count === 1 ? "" : "s"}
-                  </span>
-                </Link>
-              </li>
+              <StreamPreviewCard
+                key={v.stream_id}
+                streamId={v.stream_id}
+                count={v.count}
+              />
             ))}
-          </ul>
+          </div>
         </div>
       )}
 
@@ -328,40 +369,51 @@ export const PeopleDetailPage = () => {
       )}
 
       {data?.occurrences && data.occurrences.length > 0 && (
-        <ul className="flex flex-col gap-2">
-          {data.occurrences.map((o, i) => (
-            <li
-              key={`${o.stream_id}-${o.t_seconds}-${i}`}
-              className="w-full flex items-center gap-3 border-2 border-foreground/15 bg-card px-4 py-3 transition-colors"
-            >
-              <Link
-                to={`/streams/${o.stream_id}`}
-                className="flex-1 min-w-0"
-              >
-                <span className="block text-[11px] uppercase font-bold tracking-tight truncate hover:text-primary">
-                  stream/{o.stream_id.slice(0, 8)}
-                </span>
-                <span className="block text-[10px] uppercase text-muted-foreground mt-0.5">
-                  at {formatSeconds(o.t_seconds)} ·{" "}
-                  {Math.round(o.confidence * 100)}% ·{" "}
-                  {formatTime(o.created_at)}
-                </span>
-              </Link>
-              <span
-                className={cn(
-                  "text-[9px] uppercase font-bold px-1.5 py-0.5 border",
-                  o.confidence >= 0.7
-                    ? "text-green-600 border-green-600"
-                    : o.confidence >= 0.4
-                      ? "text-yellow-600 border-yellow-600"
-                      : "text-muted-foreground border-foreground/30",
-                )}
-              >
-                {Math.round(o.confidence * 100)}%
-              </span>
-            </li>
-          ))}
-        </ul>
+        <details className="group border-2 border-foreground/20 bg-muted/10">
+          <summary className="flex items-center gap-3 px-4 py-3 cursor-pointer list-none select-none">
+            <span className="text-[10px] uppercase font-bold tracking-wider">
+              {data.occurrences.length} occurrence
+              {data.occurrences.length === 1 ? "" : "s"}
+            </span>
+            <ChevronDown className="size-4 ml-auto shrink-0 transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="px-4 pb-4">
+            <ul className="flex flex-col gap-2">
+              {data.occurrences.map((o, i) => (
+                <li
+                  key={`${o.stream_id}-${o.t_seconds}-${i}`}
+                  className="w-full flex items-center gap-3 border-2 border-foreground/15 bg-card px-4 py-3 transition-colors"
+                >
+                  <Link
+                    to={`/streams/${o.stream_id}`}
+                    className="flex-1 min-w-0"
+                  >
+                    <span className="block text-[11px] uppercase font-bold tracking-tight truncate hover:text-primary">
+                      stream/{o.stream_id.slice(0, 8)}
+                    </span>
+                    <span className="block text-[10px] uppercase text-muted-foreground mt-0.5">
+                      at {formatSeconds(o.t_seconds)} ·{" "}
+                      {Math.round(o.confidence * 100)}% ·{" "}
+                      {formatTime(o.created_at)}
+                    </span>
+                  </Link>
+                  <span
+                    className={cn(
+                      "text-[9px] uppercase font-bold px-1.5 py-0.5 border",
+                      o.confidence >= 0.7
+                        ? "text-green-600 border-green-600"
+                        : o.confidence >= 0.4
+                          ? "text-yellow-600 border-yellow-600"
+                          : "text-muted-foreground border-foreground/30",
+                    )}
+                  >
+                    {Math.round(o.confidence * 100)}%
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </details>
       )}
 
       <Dialog
