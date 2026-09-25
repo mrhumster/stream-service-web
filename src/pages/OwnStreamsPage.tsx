@@ -1,8 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { StreamCard } from "@/components/stream-card";
 import { useAuth } from "@/hooks/useAuth";
-import { useListOwnStreamsQuery } from "@/services/streams";
+import {
+  useListOwnStreamsQuery,
+  useDetectFacesBatchMutation,
+} from "@/services/streams";
+import { toast } from "sonner";
 import {
   formatDate,
   formatDuration,
@@ -12,7 +16,7 @@ import {
   thumbnailUrl,
 } from "@/lib/stream-format";
 import { cn } from "@/lib/utils";
-import { Plus, Loader2, LayoutGrid, List, ChevronUp, ChevronDown, Image } from "lucide-react";
+import { Plus, Loader2, LayoutGrid, List, ChevronUp, ChevronDown, Image, Filter, User } from "lucide-react";
 import {
   Table,
   TableHeader,
@@ -21,13 +25,25 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
-import type { StreamResponse } from "@/types/stream.types";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuItem,
+} from "@/components/ui/8bit/dropdown-menu";
+import type { StreamResponse, StreamStatus, StreamSortBy, StreamSortOrder } from "@/types/stream.types";
 import { ShareButton } from "@/components/stream/share-button";
 
 type ViewMode = "grid" | "table";
-type SortField = "created_at" | "title" | "status";
 
 const PAGE_SIZE = 50;
+
+type StatusFilter = StreamStatus | "all";
+type FacesFilter = "all" | "detected" | "not_detected";
+
+const STATUS_OPTIONS: StreamStatus[] = ["draft", "processing", "ready", "published", "error"];
 
 function ThumbCell({ stream }: { stream: StreamResponse }) {
   const [broken, setBroken] = useState(false);
@@ -49,27 +65,14 @@ function ThumbCell({ stream }: { stream: StreamResponse }) {
   );
 }
 
-function compareStreams(a: StreamResponse, b: StreamResponse, field: SortField): number {
-  switch (field) {
-    case "created_at":
-      return a.created_at.localeCompare(b.created_at);
-    case "title":
-      return a.title.localeCompare(b.title);
-    case "status":
-      return a.status.localeCompare(b.status);
-    default:
-      return 0;
-  }
-}
-
 function SortIcon({
   field,
   activeField,
   direction,
 }: {
-  field: SortField;
-  activeField: SortField;
-  direction: "asc" | "desc";
+  field: StreamSortBy;
+  activeField: StreamSortBy;
+  direction: StreamSortOrder;
 }) {
   if (activeField !== field) return null;
   return direction === "asc" ? (
@@ -79,16 +82,95 @@ function SortIcon({
   );
 }
 
+function PixelFilterButton({
+  label,
+  className,
+}: {
+  label: string;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "inline-flex items-center gap-1.5 h-9 px-3 border-4 uppercase text-xs font-bold transition-colors",
+        className,
+      )}
+    >
+      <Filter className="size-3.5" />
+      {label}
+    </button>
+  );
+}
+
 export const OwnStreamsPage = () => {
   const { isAuth } = useAuth();
   const navigate = useNavigate();
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [offset, setOffset] = useState(0);
 
+  const [viewMode, setViewMode] = useState<ViewMode>("table");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [facesFilter, setFacesFilter] = useState<FacesFilter>("all");
+  const [sortField, setSortField] = useState<StreamSortBy>("created_at");
+  const [sortDir, setSortDir] = useState<StreamSortOrder>("desc");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const [detectFacesBatch, { isLoading: isBatchLoading }] =
+    useDetectFacesBatchMutation();
+
   const { data, isLoading, isFetching, error } = useListOwnStreamsQuery({
     limit: PAGE_SIZE,
     offset,
+    status: statusFilter === "all" ? undefined : statusFilter,
+    faces_detected:
+      facesFilter === "all"
+        ? undefined
+        : facesFilter === "detected",
+    sort: sortField,
+    order: sortDir,
   });
+
+  const streams = data?.items ?? [];
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      const allSelected =
+        streams.length > 0 && streams.every((s) => prev.has(s.id));
+      if (allSelected) return new Set();
+      return new Set(streams.map((s) => s.id));
+    });
+  };
+
+  const selectedStreams = streams.filter((s) => selectedIds.has(s.id));
+  const eligibleIds = selectedStreams
+    .filter((s) => !s.faces_detected)
+    .map((s) => s.id);
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleDetectFacesBatch = async () => {
+    if (eligibleIds.length === 0) return;
+    try {
+      const res = await detectFacesBatch({ ids: eligibleIds }).unwrap();
+      const processed = res.processed.length;
+      toast.success(
+        `Face detection started for ${processed} stream${processed === 1 ? "" : "s"}`,
+      );
+      clearSelection();
+    } catch {
+      toast.error("Failed to start face detection");
+    }
+  };
 
   const hasMore = data ? data.items.length < data.total : false;
 
@@ -113,25 +195,24 @@ export const OwnStreamsPage = () => {
     return () => observer.disconnect();
   }, [loadMore]);
 
-  const [viewMode, setViewMode] = useState<ViewMode>("table");
-  const [sortField, setSortField] = useState<SortField>("created_at");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-
-  const sortedItems = useMemo(() => {
-    if (!data?.items) return [];
-    return [...data.items].sort((a, b) => {
-      const cmp = compareStreams(a, b, sortField);
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-  }, [data, sortField, sortDir]);
-
-  const handleSort = (field: SortField) => {
+  const handleSort = (field: StreamSortBy) => {
     if (sortField === field) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setSortField(field);
       setSortDir("asc");
     }
+    setOffset(0);
+  };
+
+  const applyStatusFilter = (status: StatusFilter) => {
+    setStatusFilter(status);
+    setOffset(0);
+  };
+
+  const applyFacesFilter = (faces: FacesFilter) => {
+    setFacesFilter(faces);
+    setOffset(0);
   };
 
   return (
@@ -142,6 +223,76 @@ export const OwnStreamsPage = () => {
           My Streams
         </h2>
         <div className="flex items-center gap-2">
+          {/* Status filter */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <div>
+                <PixelFilterButton
+                  className={cn(
+                    statusFilter === "all"
+                      ? "bg-muted text-muted-foreground hover:bg-muted/80"
+                      : "bg-primary text-primary-foreground",
+                  )}
+                  label={
+                    statusFilter === "all"
+                      ? "All statuses"
+                      : (statusConfig[statusFilter]?.label ?? statusFilter)
+                  }
+                />
+              </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" font="retro">
+              <DropdownMenuLabel>Status</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => applyStatusFilter("all")}>
+                All statuses
+              </DropdownMenuItem>
+              {STATUS_OPTIONS.map((status) => (
+                <DropdownMenuItem
+                  key={status}
+                  onClick={() => applyStatusFilter(status)}
+                >
+                  {statusConfig[status]?.label ?? status}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Faces filter */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <div>
+                <PixelFilterButton
+                  className={cn(
+                    facesFilter === "all"
+                      ? "bg-muted text-muted-foreground hover:bg-muted/80"
+                      : "bg-primary text-primary-foreground",
+                  )}
+                  label={
+                    facesFilter === "all"
+                      ? "All faces"
+                      : facesFilter === "detected"
+                        ? "Faces detected"
+                        : "No faces"
+                  }
+                />
+              </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" font="retro">
+              <DropdownMenuLabel>Faces detection</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => applyFacesFilter("all")}>
+                All streams
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => applyFacesFilter("detected")}>
+                Faces detected
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => applyFacesFilter("not_detected")}>
+                No faces
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           {/* View toggle */}
           <div className="flex border-4 border-foreground/20">
             <button
@@ -184,6 +335,44 @@ export const OwnStreamsPage = () => {
         </div>
       </div>
 
+      {/* Batch toolbar */}
+      {selectedIds.size > 0 && data && data.items.length > 0 && (
+        <div className="mb-6 flex flex-wrap items-center gap-3 border-4 border-foreground/20 bg-card p-3 shadow-[4px_4px_0_0_rgba(0,0,0,0.3)]">
+          <span className="text-xs uppercase font-bold text-muted-foreground">
+            {selectedIds.size} selected
+            {eligibleIds.length !== selectedIds.size && (
+              <>
+                {" "}
+                · {eligibleIds.length} ready for detection
+              </>
+            )}
+          </span>
+          <button
+            type="button"
+            disabled={eligibleIds.length === 0 || isBatchLoading}
+            onClick={handleDetectFacesBatch}
+            className={cn(
+              "inline-flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold disabled:opacity-50 disabled:pointer-events-none",
+            )}
+          >
+            {isBatchLoading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <User className="size-4" />
+            )}
+            Detect Faces
+            {eligibleIds.length > 0 && ` (${eligibleIds.length})`}
+          </button>
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="inline-flex items-center gap-2 bg-card text-card-foreground hover:bg-accent border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
       {/* Loading */}
       {isLoading && (
         <div className="flex justify-center py-12">
@@ -208,8 +397,14 @@ export const OwnStreamsPage = () => {
       {/* Grid view */}
       {data && data.items.length > 0 && viewMode === "grid" && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {sortedItems.map((stream) => (
-            <StreamCard key={stream.id} stream={stream} />
+          {data.items.map((stream) => (
+            <StreamCard
+              key={stream.id}
+              stream={stream}
+              selectable
+              selected={selectedIds.has(stream.id)}
+              onToggle={toggleSelect}
+            />
           ))}
         </div>
       )}
@@ -219,6 +414,19 @@ export const OwnStreamsPage = () => {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10">
+                <label className="inline-flex cursor-pointer items-center">
+                  <input
+                    type="checkbox"
+                    checked={
+                      streams.length > 0 &&
+                      streams.every((s) => selectedIds.has(s.id))
+                    }
+                    onChange={toggleSelectAll}
+                    className="size-4 accent-[#ffcc00]"
+                  />
+                </label>
+              </TableHead>
               <TableHead className="w-12 hidden sm:table-cell" />
               <TableHead>
                 <button
@@ -253,7 +461,7 @@ export const OwnStreamsPage = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedItems.map((stream) => {
+            {data.items.map((stream) => {
               const status = statusConfig[stream.status] ?? defaultStatus;
               return (
                 <TableRow
@@ -261,6 +469,21 @@ export const OwnStreamsPage = () => {
                   className="cursor-pointer"
                   onClick={() => navigate(`/streams/${stream.id}`)}
                 >
+                  {/* Select */}
+                  <TableCell
+                    className="p-1.5"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <label className="inline-flex cursor-pointer items-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(stream.id)}
+                        onChange={() => toggleSelect(stream.id)}
+                        className="size-4 accent-[#ffcc00]"
+                      />
+                    </label>
+                  </TableCell>
+
                   {/* Thumbnail */}
                   <TableCell className="p-1.5 hidden sm:table-cell">
                     <ThumbCell stream={stream} />

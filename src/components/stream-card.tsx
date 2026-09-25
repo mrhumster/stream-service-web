@@ -21,7 +21,19 @@ import {
 } from "@/lib/stream-format"
 import type { StreamResponse } from "@/types/stream.types"
 
-export function StreamCard({ stream, showMeta = true }: { stream: StreamResponse; showMeta?: boolean }) {
+export function StreamCard({
+  stream,
+  showMeta = true,
+  selectable = false,
+  selected = false,
+  onToggle,
+}: {
+  stream: StreamResponse
+  showMeta?: boolean
+  selectable?: boolean
+  selected?: boolean
+  onToggle?: (id: string) => void
+}) {
   const status = statusConfig[stream.status] ?? defaultStatus
   const [thumbnailError, setThumbnailError] = useState(false)
   const showThumbnail = hasThumbnail(stream.status) && !thumbnailError
@@ -31,6 +43,22 @@ export function StreamCard({ stream, showMeta = true }: { stream: StreamResponse
     <Link to={`/streams/${stream.id}`} className="block">
     <Card className="rounded-none border-4 border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,0.3)] gap-4 py-0 overflow-hidden cursor-pointer transition-colors hover:border-primary">
       <div className="relative aspect-square bg-muted border-b-2 border-foreground/10 overflow-hidden">
+        {selectable && onToggle && (
+          <label
+            className="absolute top-1.5 left-1.5 z-20 inline-flex cursor-pointer items-center bg-black/70 p-0.5"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={() => onToggle(stream.id)}
+              className="size-4 accent-[#ffcc00]"
+            />
+          </label>
+        )}
         {showThumbnail ? (
           <>
             <img

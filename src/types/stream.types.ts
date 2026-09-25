@@ -67,9 +67,16 @@ export interface StreamResponse {
   faces_detected?: boolean;
 }
 
+export type StreamSortBy = "created_at" | "title" | "status";
+export type StreamSortOrder = "asc" | "desc";
+
 export interface StreamListParams {
   limit?: number;
   offset?: number;
+  status?: StreamStatus;
+  faces_detected?: boolean;
+  sort?: StreamSortBy;
+  order?: StreamSortOrder;
 }
 
 export interface StreamListResponse {
@@ -77,6 +84,20 @@ export interface StreamListResponse {
   total: number;
   limit: number;
   offset: number;
+}
+
+export interface FacesBatchRequest {
+  ids: string[];
+}
+
+export interface FacesBatchFailure {
+  stream_id: string;
+  reason: string;
+}
+
+export interface FacesBatchResponse {
+  processed: string[];
+  failed: FacesBatchFailure[];
 }
 
 export interface StartUploadRequest {

@@ -19,6 +19,8 @@ import type {
   UploadPartRequest,
   UploadPartResponse,
   CompleteUploadRequest,
+  FacesBatchResponse,
+  FacesBatchRequest,
 } from "../types/stream.types";
 
 const baseQuery = fetchBaseQuery({
@@ -84,9 +86,20 @@ export const streamApi = createApi({
         const searchParams = new URLSearchParams();
         searchParams.set("limit", String(params.limit ?? 10));
         searchParams.set("offset", String(params.offset ?? 0));
+        if (params.status) searchParams.set("status", params.status);
+        if (params.faces_detected !== undefined)
+          searchParams.set("faces_detected", String(params.faces_detected));
+        if (params.sort && params.sort !== "created_at")
+          searchParams.set("sort", params.sort);
+        if (params.order && params.order !== "desc")
+          searchParams.set("order", params.order);
         return `stream/own?${searchParams.toString()}`;
       },
-      serializeQueryArgs: ({ endpointName }) => endpointName,
+      serializeQueryArgs: ({ endpointName, queryArgs }) => {
+        const { limit, status, faces_detected, sort, order } =
+          queryArgs ?? {};
+        return `${endpointName}:${JSON.stringify({ limit, status, faces_detected, sort, order })}`;
+      },
       merge: (currentCache, newItems) => {
         if (newItems.offset === 0) return newItems;
         return {
@@ -268,6 +281,23 @@ export const streamApi = createApi({
         { type: "Stream" as const, id: "LIST" },
       ],
     }),
+    detectFacesBatch: builder.mutation<
+      FacesBatchResponse,
+      FacesBatchRequest
+    >({
+      query: (body) => ({
+        url: "stream/faces/batch",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (res) => [
+        { type: "Stream" as const, id: "LIST" },
+        ...(res?.processed ?? []).map((id) => ({
+          type: "Stream" as const,
+          id,
+        })),
+      ],
+    }),
   }),
 });
 
@@ -287,4 +317,5 @@ export const {
   useUnpublishStreamMutation,
   useReprocessStreamMutation,
   useProcessFacesStreamMutation,
+  useDetectFacesBatchMutation,
 } = streamApi;
