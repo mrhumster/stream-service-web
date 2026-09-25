@@ -21,6 +21,7 @@ import type {
   DeleteFaceResponse,
   DeleteEmptyFacesResponse,
   FaceListParams,
+  FacesSuggestResponse,
 } from "../types/face.types.ts";
 
 const baseQuery = fetchBaseQuery({
@@ -144,6 +145,16 @@ export const facesApi = createApi({
         currentArg?.offset !== previousArg?.offset,
       providesTags: () => [{ type: "Faces" as const, id: "LIST" }],
     }),
+    getFaceSuggestions: builder.query<
+      FacesSuggestResponse,
+      { q: string; exclude?: string }
+    >({
+      query: ({ q, exclude }) => {
+        const searchParams = new URLSearchParams({ q });
+        if (exclude) searchParams.set("exclude", exclude);
+        return `faces/suggest?${searchParams.toString()}`;
+      },
+    }),
     getFace: builder.query<FaceDetailResponse, string>({
       query: (clusterId) => `faces/${clusterId}`,
       providesTags: (_res, _err, id) => [{ type: "Faces" as const, id }],
@@ -241,6 +252,7 @@ export const facesApi = createApi({
 export const {
   useListFacesQuery,
   useGetFaceQuery,
+  useGetFaceSuggestionsQuery,
   useRenameFaceMutation,
   useListStreamFacesQuery,
   useGetFaceCropQuery,

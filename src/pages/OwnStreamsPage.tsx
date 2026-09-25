@@ -33,15 +33,26 @@ import {
   DropdownMenuSeparator,
   DropdownMenuItem,
 } from "@/components/ui/8bit/dropdown-menu";
-import type { StreamResponse, StreamStatus, StreamSortBy, StreamSortOrder } from "@/types/stream.types";
+import type {
+  StreamResponse,
+  StreamStatus,
+  StreamStatusFilter,
+  FacesFilterValue,
+  StreamSortBy,
+  StreamSortOrder,
+} from "@/types/stream.types";
 import { ShareButton } from "@/components/stream/share-button";
-
-type ViewMode = "grid" | "table";
+import { useAppDispatch, useAppSelector } from "@/hooks";
+import {
+  selectOwnStreamsFilters,
+  setStatusFilter,
+  setFacesFilter,
+  setSortField,
+  setSortDir,
+  setViewMode,
+} from "@/feature/ownStreams/ownStreamsFiltersSlice";
 
 const PAGE_SIZE = 50;
-
-type StatusFilter = StreamStatus | "all";
-type FacesFilter = "all" | "detected" | "not_detected";
 
 const STATUS_OPTIONS: StreamStatus[] = ["draft", "processing", "ready", "published", "error"];
 
@@ -106,14 +117,12 @@ function PixelFilterButton({
 export const OwnStreamsPage = () => {
   const { isAuth } = useAuth();
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [offset, setOffset] = useState(0);
 
-  const [viewMode, setViewMode] = useState<ViewMode>("table");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [facesFilter, setFacesFilter] = useState<FacesFilter>("all");
-  const [sortField, setSortField] = useState<StreamSortBy>("created_at");
-  const [sortDir, setSortDir] = useState<StreamSortOrder>("desc");
+  const filters = useAppSelector(selectOwnStreamsFilters);
+  const { viewMode, statusFilter, facesFilter, sortField, sortDir } = filters;
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const [detectFacesBatch, { isLoading: isBatchLoading }] =
@@ -197,23 +206,33 @@ export const OwnStreamsPage = () => {
 
   const handleSort = (field: StreamSortBy) => {
     if (sortField === field) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+      dispatch(setSortDir(sortDir === "asc" ? "desc" : "asc"));
     } else {
-      setSortField(field);
-      setSortDir("asc");
+      dispatch(setSortField(field));
+      dispatch(setSortDir("asc"));
     }
     setOffset(0);
   };
 
-  const applyStatusFilter = (status: StatusFilter) => {
-    setStatusFilter(status);
+  const applyStatusFilter = (status: StreamStatusFilter) => {
+    dispatch(setStatusFilter(status));
     setOffset(0);
   };
 
-  const applyFacesFilter = (faces: FacesFilter) => {
-    setFacesFilter(faces);
+  const applyFacesFilter = (faces: FacesFilterValue) => {
+    dispatch(setFacesFilter(faces));
     setOffset(0);
   };
+
+  const clearAllFilters = () => {
+    dispatch(setStatusFilter("all"));
+    dispatch(setFacesFilter("all"));
+    dispatch(setSortField("created_at"));
+    dispatch(setSortDir("desc"));
+    setOffset(0);
+  };
+
+  const isFiltering = statusFilter !== "all" || facesFilter !== "all";
 
   return (
     <div>
@@ -297,7 +316,7 @@ export const OwnStreamsPage = () => {
           <div className="flex border-4 border-foreground/20">
             <button
               type="button"
-              onClick={() => setViewMode("table")}
+              onClick={() => dispatch(setViewMode("table"))}
               className={cn(
                 "p-1.5 transition-colors",
                 viewMode === "table"
@@ -310,7 +329,7 @@ export const OwnStreamsPage = () => {
             </button>
             <button
               type="button"
-              onClick={() => setViewMode("grid")}
+              onClick={() => dispatch(setViewMode("grid"))}
               className={cn(
                 "p-1.5 transition-colors",
                 viewMode === "grid"
@@ -389,9 +408,22 @@ export const OwnStreamsPage = () => {
 
       {/* Empty */}
       {data && data.items.length === 0 && (
-        <p className="text-center text-muted-foreground text-sm uppercase font-bold py-12">
-          No streams yet
-        </p>
+        <div className="flex flex-col items-center gap-4 py-12">
+          <p className="text-center text-muted-foreground text-sm uppercase font-bold">
+            {isFiltering
+              ? "No streams match the selected filters"
+              : "No streams yet"}
+          </p>
+          {isFiltering && (
+            <button
+              type="button"
+              onClick={clearAllFilters}
+              className="inline-flex items-center gap-2 bg-card text-card-foreground hover:bg-accent border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold"
+            >
+              Reset filters
+            </button>
+          )}
+        </div>
       )}
 
       {/* Grid view */}

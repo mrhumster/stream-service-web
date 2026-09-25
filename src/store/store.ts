@@ -1,6 +1,7 @@
 import { combineReducers, configureStore } from "@reduxjs/toolkit";
 import { authSlice } from "../feature/auth/authSlice";
 import { settingsReducer } from "../feature/settings/settingsSlice";
+import { ownStreamsFiltersReducer } from "../feature/ownStreams/ownStreamsFiltersSlice";
 import { authApi } from "../services/auth";
 import { userApi } from "../services/users";
 import { streamApi } from "../services/streams";
@@ -21,6 +22,7 @@ const rootReducer = combineReducers({
   [facesApi.reducerPath]: facesApi.reducer,
   auth: authSlice.reducer,
   settings: settingsReducer,
+  ownStreamsFilters: ownStreamsFiltersReducer,
 });
 
 export const store = configureStore({

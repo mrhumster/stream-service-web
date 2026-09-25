@@ -70,6 +70,10 @@ export interface StreamResponse {
 export type StreamSortBy = "created_at" | "title" | "status";
 export type StreamSortOrder = "asc" | "desc";
 
+export type StreamStatusFilter = StreamStatus | "all";
+export type FacesFilterValue = "all" | "detected" | "not_detected";
+export type StreamViewMode = "grid" | "table";
+
 export interface StreamListParams {
   limit?: number;
   offset?: number;

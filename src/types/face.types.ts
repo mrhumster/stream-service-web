@@ -45,6 +45,18 @@ export interface FaceListParams {
   offset?: number;
 }
 
+export interface FaceNameSuggestion {
+  id: string;
+  name: string | null;
+  is_named: boolean;
+  sample_count: number;
+  crop_object?: string | null;
+}
+
+export interface FacesSuggestResponse {
+  clusters: FaceNameSuggestion[];
+}
+
 export interface FacesListResponse {
   clusters: FaceClusterWithStats[];
   groups: SimilarityGroup<FaceClusterWithStats>[];

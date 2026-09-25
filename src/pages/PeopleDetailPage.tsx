@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import {
   Loader2,
@@ -8,6 +8,7 @@ import {
   PenSquare,
   Upload,
   Delete,
+  Merge,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -20,9 +21,11 @@ import {
 } from "@/components/ui/dialog";
 import {
   useGetFaceQuery,
+  useGetFaceSuggestionsQuery,
   useRenameFaceMutation,
   useReplaceFaceCropMutation,
   useDeleteFaceMutation,
+  useMergeFacesMutation,
 } from "@/services/faces";
 import { FaceCrop } from "@/components/faces/face-crop";
 import { cn } from "@/lib/utils";
@@ -64,6 +67,7 @@ export const PeopleDetailPage = () => {
   const [renameFace, { isLoading: renaming }] = useRenameFaceMutation();
   const [replaceCrop, { isLoading: replacing }] = useReplaceFaceCropMutation();
   const [deleteFace, { isLoading: deleting }] = useDeleteFaceMutation();
+  const [mergeFaces, { isLoading: merging }] = useMergeFacesMutation();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [editing, setEditing] = useState(false);
@@ -71,6 +75,27 @@ export const PeopleDetailPage = () => {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const cluster = data?.cluster;
+
+  const rawPrefix =
+    editing && name.trim().length >= 3 && cluster ? name.trim() : "";
+  const [debouncedPrefix, setDebouncedPrefix] = useState("");
+  useEffect(() => {
+    if (!rawPrefix) {
+      setDebouncedPrefix("");
+      return;
+    }
+    const t = setTimeout(() => setDebouncedPrefix(rawPrefix), 400);
+    return () => clearTimeout(t);
+  }, [rawPrefix]);
+
+  const { data: suggestionsData, isFetching: suggesting } =
+    useGetFaceSuggestionsQuery(
+      { q: debouncedPrefix, exclude: cluster?.id },
+      { skip: debouncedPrefix.length < 3 || !cluster },
+    );
+  const suggestions = (suggestionsData?.clusters ?? []).filter(
+    (s) => s.id !== cluster?.id,
+  );
 
   const onPickFile = async (file: File | null) => {
     if (!file || !cluster) return;
@@ -99,7 +124,28 @@ export const PeopleDetailPage = () => {
       setEditing(false);
       toast.success("Name updated");
     } catch {
-      toast.error("Failed to update name");
+      const collides = suggestions.some(
+        (s) => s.name?.toLowerCase() === cleaned.toLowerCase(),
+      );
+      if (collides) {
+        toast.error("That name already belongs to another person — merge instead");
+      } else {
+        toast.error("Failed to update name");
+      }
+    }
+  };
+
+  const runMergeInto = async (targetId: string, targetName: string | null) => {
+    if (!cluster) return;
+    try {
+      await mergeFaces({ cluster_ids: [targetId, cluster.id] }).unwrap();
+      setEditing(false);
+      toast.success(`Merged into ${targetName || "person"}`);
+      navigate(`/people/${targetId}`);
+    } catch (err) {
+      const detail = (err as { data?: { detail?: string } } | undefined)?.data
+        ?.detail;
+      toast.error(detail ? `Failed: ${detail}` : "Failed to merge people");
     }
   };
 
@@ -206,6 +252,42 @@ export const PeopleDetailPage = () => {
             <Undo className="size-3.5" />
             Cancel
           </button>
+          {suggestions.length > 0 && (
+            <div className="w-full flex flex-col gap-1.5 border-2 border-primary/50 bg-background px-3 py-2 mt-1">
+              <p className="text-[10px] uppercase font-bold text-muted-foreground">
+                A person with this name exists
+              </p>
+              {suggestions.map((s) => (
+                <div
+                  key={s.id}
+                  className="flex flex-wrap items-center justify-between gap-2"
+                >
+                  <span className="text-xs uppercase font-bold truncate">
+                    {s.name}
+                    <span className="text-muted-foreground font-normal normal-case">
+                      {" "}
+                      · {s.sample_count} sample
+                      {s.sample_count === 1 ? "" : "s"}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    disabled={merging}
+                    onClick={() => void runMergeInto(s.id, s.name)}
+                    className="inline-flex items-center gap-1.5 border-2 border-black bg-primary text-primary-foreground hover:bg-primary/90 px-2 py-1 text-[9px] uppercase font-bold shadow-[2px_2px_0_0_rgba(0,0,0,0.8)] active:shadow-none active:translate-x-[1px] active:translate-y-[1px] rounded-none disabled:opacity-50"
+                  >
+                    <Merge className="size-3" />
+                    {merging ? "Merging..." : "Merge into"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {suggesting && suggestionsData?.clusters.length === 0 && (
+            <span className="w-full text-[10px] uppercase font-bold text-muted-foreground">
+              Searching for matching people…
+            </span>
+          )}
         </div>
       )}
 
