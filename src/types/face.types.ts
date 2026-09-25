@@ -71,6 +71,14 @@ export interface DeleteEmptyFacesResponse {
   deleted: number;
 }
 
+export interface DetachStreamFaceResponse {
+  cluster_id: string;
+  stream_id: string;
+  removed: number;
+  sample_count: number;
+  cluster_deleted: boolean;
+}
+
 export interface FaceDetailResponse {
   cluster: FaceCluster;
   occurrences: FaceOccurrence[];

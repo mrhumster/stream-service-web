@@ -20,6 +20,7 @@ import type {
   MergeFacesResponse,
   DeleteFaceResponse,
   DeleteEmptyFacesResponse,
+  DetachStreamFaceResponse,
   FaceListParams,
   FacesSuggestResponse,
 } from "../types/face.types.ts";
@@ -246,6 +247,20 @@ export const facesApi = createApi({
       }),
       invalidatesTags: () => [{ type: "Faces" as const, id: "LIST" }],
     }),
+    detachFaceFromStream: builder.mutation<
+      DetachStreamFaceResponse,
+      { streamId: string; clusterId: string }
+    >({
+      query: ({ streamId, clusterId }) => ({
+        url: `streams/${streamId}/faces/${clusterId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (_res, _err, { streamId, clusterId }) => [
+        { type: "Faces" as const, id: streamId },
+        { type: "Faces" as const, id: clusterId },
+        { type: "Faces" as const, id: "LIST" },
+      ],
+    }),
   }),
 });
 
@@ -260,4 +275,5 @@ export const {
   useDeleteFaceMutation,
   useMergeFacesMutation,
   useDeleteEmptyFacesMutation,
+  useDetachFaceFromStreamMutation,
 } = facesApi;
