@@ -38,7 +38,59 @@ const refreshBaseQuery = fetchBaseQuery({
   timeout: 30000,
 });
 
+/* Crop-fetch concurrency cap. FaceCrop lazy-loads a crop per cluster row, and
+ * scrolling a large /people list can put dozens in flight at once. That burst
+ * saturates faces-service's DB pool and produced unhandled 500s. We bound
+ * in-flight crop requests here (defense-in-depth alongside the backend's pool
+ * queueing). */
+const CROP_MAX_CONCURRENCY = 8;
+let cropInFlight = 0;
+const cropWaiters: Array<() => void> = [];
+
+function acquireCropSlot(): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const tryAcquire = () => {
+      if (cropInFlight < CROP_MAX_CONCURRENCY) {
+        cropInFlight++;
+        resolve();
+      } else {
+        cropWaiters.push(tryAcquire);
+      }
+    };
+    tryAcquire();
+  });
+}
+
+function releaseCropSlot() {
+  cropInFlight--;
+  const next = cropWaiters.shift();
+  if (next) next();
+}
+
+const isCropUrl = (args: string | FetchArgs): boolean =>
+  typeof args === "string"
+    ? args.includes("/crop")
+    : String(args.url).includes("/crop");
+
 const baseQueryWithReauth: BaseQueryFn<
+  string | FetchArgs,
+  unknown,
+  FetchBaseQueryError
+> = async (args, api, extraOptions) => {
+  const run = () => baseQueryWithRetry(args, api, extraOptions);
+
+  if (isCropUrl(args)) {
+    await acquireCropSlot();
+    try {
+      return await run();
+    } finally {
+      releaseCropSlot();
+    }
+  }
+  return run();
+};
+
+const baseQueryWithRetry: BaseQueryFn<
   string | FetchArgs,
   unknown,
   FetchBaseQueryError
