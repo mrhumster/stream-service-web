@@ -131,6 +131,7 @@ export const PeopleDetailPage = () => {
           <FaceCrop
             clusterId={cluster.id}
             hasCrop={Boolean(cluster.crop_object)}
+            lazy={false}
             className="size-16 border-4 border-foreground/30"
             iconClassName="size-8"
           />
