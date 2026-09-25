@@ -115,7 +115,7 @@ function PersonRow({
   children,
 }: PersonRowProps) {
   return (
-    <li className="flex items-center gap-2 border-4 bg-card text-foreground hover:bg-accent border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none px-4 py-3 transition-colors">
+    <li className="flex items-center gap-2 border-4 bg-card text-foreground hover:bg-accent border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,1)] rounded-none px-4 py-3 transition-colors">
       {mergeMode && (
         <label className="inline-flex items-center shrink-0 cursor-pointer">
           <input
