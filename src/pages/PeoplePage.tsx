@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { Loader2, Sparkles, Copy, Delete, Merge } from "lucide-react";
+import { Loader2, Sparkles, Copy, Delete, Merge, Users as UsersIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -12,6 +12,12 @@ import {
 } from "@/components/ui/dialog";
 import { useListFacesQuery, useDeleteFaceMutation, useMergeFacesMutation } from "@/services/faces";
 import { FaceCrop } from "@/components/faces/face-crop";
+import {
+  buildSimilarityGroups,
+  formatPercent,
+  SIMILARITY_THRESHOLD,
+  type SimilarityGroup,
+} from "@/lib/face-similarity";
 import type { FacesListResponse } from "@/types/face.types";
 
 const pixelBtnOutline =
@@ -72,6 +78,142 @@ function collapseDuplicates(
   });
 }
 
+type Person = FacesListResponse["clusters"][number];
+
+interface PersonRowProps {
+  person: Person;
+  mergeMode: boolean;
+  selected: boolean;
+  onToggle: (id: string) => void;
+  similar?: number;
+  simLabel?: string;
+  onDelete?: (person: Person) => void;
+  children?: ReactNode;
+}
+
+function PersonRow({
+  person: c,
+  mergeMode,
+  selected,
+  onToggle,
+  similar,
+  simLabel,
+  onDelete,
+  children,
+}: PersonRowProps) {
+  return (
+    <li className="flex items-center gap-2 border-4 bg-card text-foreground hover:bg-accent border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none px-4 py-3 transition-colors">
+      {mergeMode && (
+        <label className="inline-flex items-center shrink-0 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={() => onToggle(c.id)}
+            className="size-4 accent-[#ffcc00]"
+          />
+        </label>
+      )}
+      <Link
+        to={`/people/${c.id}`}
+        className="flex-1 min-w-0 flex items-center gap-3"
+      >
+        <FaceCrop clusterId={c.id} hasCrop={Boolean(c.crop_object)} />
+        <span className="flex-1 min-w-0">
+          <span className="block text-[11px] uppercase font-bold tracking-tight truncate">
+            {c.is_named ? c.name : `Person ${formatShortId(c.id)}`}
+          </span>
+          <span className="block text-[10px] uppercase text-muted-foreground mt-0.5">
+            {c.sample_count} sample{c.sample_count === 1 ? "" : "s"} ·{" "}
+            {c.video_count} video{c.video_count === 1 ? "" : "s"} · in{" "}
+            {c.videos?.length ?? 0} stream
+            {(c.videos?.length ?? 0) === 1 ? "" : "s"} ·{" "}
+            {formatTime(c.created_at)}
+          </span>
+        </span>
+        {(similar !== undefined && similar > 0) && (
+          <span className="inline-flex items-center gap-1 text-[9px] uppercase font-bold px-1.5 py-0.5 border border-foreground/30 text-muted-foreground shrink-0">
+            <Copy className="size-3" />
+            {similar} similar{simLabel ? ` · ${simLabel}` : ""}
+          </span>
+        )}
+        {simLabel && similar === 0 && (
+          <span className="inline-flex items-center gap-1 text-[9px] uppercase font-bold px-1.5 py-0.5 border border-foreground/30 text-muted-foreground shrink-0">
+            {simLabel} similar
+          </span>
+        )}
+      </Link>
+      <Sparkles className="size-4 text-muted-foreground shrink-0" />
+      {children}
+      {!mergeMode && onDelete && (
+        <button
+          type="button"
+          onClick={() => onDelete(c)}
+          aria-label="Delete person"
+          className="inline-flex items-center justify-center size-8 border-2 border-black bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-[2px_2px_0_0_rgba(0,0,0,0.8)] active:shadow-none active:translate-x-[1px] active:translate-y-[1px] rounded-none"
+        >
+          <Delete className="size-4" />
+        </button>
+      )}
+    </li>
+  );
+}
+
+function SimilarGroupCard({
+  group,
+  mergeMode,
+  selected,
+  onToggle,
+  onDelete,
+  onSelectAll,
+}: {
+  group: SimilarityGroup<Person>;
+  mergeMode: boolean;
+  selected: Set<string>;
+  onToggle: (id: string) => void;
+  onDelete: (person: Person) => void;
+  onSelectAll: (group: SimilarityGroup<Person>) => void;
+}) {
+  return (
+    <li className="border-4 bg-card border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,1)] rounded-none overflow-hidden">
+      <PersonRow
+        person={group.rep}
+        mergeMode={mergeMode}
+        selected={selected.has(group.rep.id)}
+        onToggle={onToggle}
+        similar={group.members.length}
+        simLabel={formatPercent(group.maxSim)}
+        onDelete={onDelete}
+      >
+        {mergeMode && (
+          <button
+            type="button"
+            onClick={() => onSelectAll(group)}
+            aria-label="Select all similar people"
+            className="inline-flex items-center gap-1 text-[10px] uppercase font-bold border-2 border-black bg-primary text-primary-foreground hover:bg-primary/90 px-2 py-1 shadow-[2px_2px_0_0_rgba(0,0,0,0.8)] active:shadow-none active:translate-x-[1px] active:translate-y-[1px] rounded-none shrink-0"
+          >
+            <UsersIcon className="size-3.5" />
+            Select {group.members.length + 1}
+          </button>
+        )}
+      </PersonRow>
+      <ul className="flex flex-col gap-1 px-4 pb-3 ml-7">
+        {group.members.map(({ cluster: m, sim }) => (
+          <PersonRow
+            key={m.id}
+            person={m}
+            mergeMode={mergeMode}
+            selected={selected.has(m.id)}
+            onToggle={onToggle}
+            similar={0}
+            simLabel={formatPercent(sim)}
+            onDelete={onDelete}
+          />
+        ))}
+      </ul>
+    </li>
+  );
+}
+
 export const PeoplePage = () => {
   const { data, isLoading, error } = useListFacesQuery();
   const [deleteFace, { isLoading: deleting }] = useDeleteFaceMutation();
@@ -79,24 +221,46 @@ export const PeoplePage = () => {
 
   const [mergeMode, setMergeMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [deleteTarget, setDeleteTarget] = useState<
-    FacesListResponse["clusters"][number] | null
-  >(null);
+  const [deleteTarget, setDeleteTarget] = useState<Person | null>(null);
   const [confirmMerge, setConfirmMerge] = useState(false);
 
   const clusters: FacesListResponse["clusters"] | undefined = data?.clusters;
+
+  const groups = useMemo(
+    () => (clusters ? buildSimilarityGroups(clusters) : []),
+    [clusters],
+  );
+
+  const groupIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const g of groups) {
+      ids.add(g.rep.id);
+      for (const m of g.members) ids.add(m.cluster.id);
+    }
+    return ids;
+  }, [groups]);
+
+  const restClusters = useMemo(
+    () => (clusters ?? []).filter((c) => !groupIds.has(c.id)),
+    [clusters, groupIds],
+  );
+
   const rows =
     clusters && clusters.length > 0
       ? mergeMode
-        ? clusters.map((c) => ({ cluster: c, similar: 0 }))
-        : collapseDuplicates(clusters)
+        ? restClusters.map((c) => ({ cluster: c, similar: 0 }))
+        : collapseDuplicates(restClusters)
       : [];
 
-  const deleteTargets: FacesListResponse["clusters"] = useMemo(() => {
+  const shownCount =
+    rows.length + groups.reduce((sum, g) => sum + 1 + g.members.length, 0);
+
+  const deleteTargets: Person[] = useMemo(() => {
     if (!deleteTarget) return [];
     if (deleteTarget.is_named && deleteTarget.name !== null) {
       // Deleting a collapsed (duplicate) person removes every cluster with the same name.
-      const sameName = (clusters ?? []).filter(
+      const allClusters = clusters ?? [];
+      const sameName = allClusters.filter(
         (c) => c.name === deleteTarget.name,
       );
       if (sameName.length > 1) return sameName;
@@ -126,6 +290,15 @@ export const PeoplePage = () => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      return next;
+    });
+  };
+
+  const selectGroupAll = (group: SimilarityGroup<Person>) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.add(group.rep.id);
+      for (const m of group.members) next.add(m.cluster.id);
       return next;
     });
   };
@@ -173,7 +346,7 @@ export const PeoplePage = () => {
         <div className="flex items-center gap-2">
           {data?.total !== undefined && (
             <span className="text-[10px] uppercase font-bold text-muted-foreground">
-              {data.total} cluster{data.total === 1 ? "" : "s"} · {rows.length}{" "}
+              {data.total} cluster{data.total === 1 ? "" : "s"} · {shownCount}{" "}
               shown
             </span>
           )}
@@ -228,59 +401,40 @@ export const PeoplePage = () => {
         </p>
       )}
 
+      {groups.length > 0 && (
+        <div className="mb-6">
+          <h3 className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-2">
+            Similar faces (similarity ≥ {formatPercent(SIMILARITY_THRESHOLD)}) —
+            likely duplicates
+          </h3>
+          <ul className="flex flex-col gap-3">
+            {groups.map((g) => (
+              <SimilarGroupCard
+                key={g.rep.id}
+                group={g}
+                mergeMode={mergeMode}
+                selected={selected}
+                onToggle={toggle}
+                onDelete={setDeleteTarget}
+                onSelectAll={selectGroupAll}
+              />
+            ))}
+          </ul>
+        </div>
+      )}
+
       {rows.length > 0 && (
         <ul className="flex flex-col gap-2">
           {rows.map(({ cluster: c, similar }) => (
-            <li
+            <PersonRow
               key={c.id}
-              className="flex items-center gap-2 border-4 bg-card text-foreground hover:bg-accent border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none px-4 py-3 transition-colors"
-            >
-              {mergeMode && (
-                <label className="inline-flex items-center shrink-0 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selected.has(c.id)}
-                    onChange={() => toggle(c.id)}
-                    className="size-4 accent-[#ffcc00]"
-                  />
-                </label>
-              )}
-              <Link
-                to={`/people/${c.id}`}
-                className="flex-1 min-w-0 flex items-center gap-3"
-              >
-                <FaceCrop clusterId={c.id} hasCrop={Boolean(c.crop_object)} />
-                <span className="flex-1 min-w-0">
-                  <span className="block text-[11px] uppercase font-bold tracking-tight truncate">
-                    {c.is_named ? c.name : `Person ${formatShortId(c.id)}`}
-                  </span>
-                  <span className="block text-[10px] uppercase text-muted-foreground mt-0.5">
-                    {c.sample_count} sample{c.sample_count === 1 ? "" : "s"} ·{" "}
-                    {c.video_count} video{c.video_count === 1 ? "" : "s"} · in{" "}
-                    {c.videos?.length ?? 0} stream
-                    {(c.videos?.length ?? 0) === 1 ? "" : "s"} ·{" "}
-                    {formatTime(c.created_at)}
-                  </span>
-                </span>
-                {similar > 0 && (
-                  <span className="inline-flex items-center gap-1 text-[9px] uppercase font-bold px-1.5 py-0.5 border border-foreground/30 text-muted-foreground shrink-0">
-                    <Copy className="size-3" />
-                    {similar} similar
-                  </span>
-                )}
-              </Link>
-              <Sparkles className="size-4 text-muted-foreground shrink-0" />
-              {!mergeMode && (
-                <button
-                  type="button"
-                  onClick={() => setDeleteTarget(c)}
-                  aria-label="Delete person"
-                  className="inline-flex items-center justify-center size-8 border-2 border-black bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-[2px_2px_0_0_rgba(0,0,0,0.8)] active:shadow-none active:translate-x-[1px] active:translate-y-[1px] rounded-none"
-                >
-                  <Delete className="size-4" />
-                </button>
-              )}
-            </li>
+              person={c}
+              mergeMode={mergeMode}
+              selected={selected.has(c.id)}
+              onToggle={toggle}
+              similar={similar}
+              onDelete={setDeleteTarget}
+            />
           ))}
         </ul>
       )}

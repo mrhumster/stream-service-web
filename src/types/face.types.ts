@@ -9,6 +9,7 @@ export interface FaceCluster {
   name: string | null;
   is_named: boolean;
   sample_count: number;
+  centroid?: number[];
   crop_object?: string | null;
   created_at: string;
   updated_at: string;
