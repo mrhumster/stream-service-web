@@ -1,6 +1,7 @@
 import { MainLayout } from "./layouts/MainLayout";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { StreamsPage } from "./pages/StreamsPage";
+import { ErrorPage } from "./pages/ErrorPage";
 import { CreateStreamPage } from "./pages/CreateStreamPage";
 import { EditStreamPage } from "./pages/EditStreamPage";
 import { StreamPage } from "./pages/StreamPage";
@@ -18,6 +19,7 @@ import { useAppSelector } from "@/hooks";
 const router = createBrowserRouter([
   {
     element: <MainLayout />,
+    errorElement: <ErrorPage />,
     children: [
       { path: "/", element: <StreamsPage /> },
       { path: "/streams", element: <StreamsPage /> },

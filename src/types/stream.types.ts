@@ -67,7 +67,7 @@ export interface StreamResponse {
   created_at: string;
   updated_at: string;
   published_at: string | null;
-  processing: StreamProcessingTask[];
+  processing: StreamProcessingTask[] | null;
   faces_detected?: boolean;
 }
 
@@ -81,6 +81,7 @@ export type StreamViewMode = "grid" | "table";
 export interface StreamListParams {
   limit?: number;
   offset?: number;
+  q?: string;
   status?: StreamStatus;
   faces_detected?: boolean;
   sort?: StreamSortBy;

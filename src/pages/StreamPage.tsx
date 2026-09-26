@@ -150,7 +150,8 @@ export const StreamPage = () => {
   const coords = parseLocation(stream.metadata?.location);
 
   const processingError =
-    stream.processing.find((t) => t.error)?.error ?? null;
+    stream.processing?.find((t) => t.error)?.error ?? null;
+  const tasks = stream.processing ?? [];
 
   const handleReprocess = async () => {
     try {
@@ -225,13 +226,13 @@ export const StreamPage = () => {
                     <ArrowLeft className="size-4" />
                     Back to Streams
                   </Link>
-                  {stream.processing.length === 0 ? (
+                  {tasks.length === 0 ? (
                     <p className="text-xs uppercase tracking-wider text-muted-foreground animate-pulse">
                       Preparing tasks...
                     </p>
                   ) : (
                     <div className="w-full max-w-md flex flex-col gap-4">
-                      {stream.processing.map((task) => (
+                      {tasks.map((task) => (
                         <div
                           key={task.task_type}
                           className="flex flex-col gap-1"

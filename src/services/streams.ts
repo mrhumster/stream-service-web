@@ -125,9 +125,13 @@ export const streamApi = createApi({
         const searchParams = new URLSearchParams();
         searchParams.set("limit", String(params.limit ?? 10));
         searchParams.set("offset", String(params.offset ?? 0));
+        if (params.q) searchParams.set("q", params.q);
         return `stream?${searchParams.toString()}`;
       },
-      serializeQueryArgs: ({ endpointName }) => endpointName,
+      serializeQueryArgs: ({ endpointName, queryArgs }) => {
+        const { limit, q } = queryArgs ?? {};
+        return `${endpointName}:${JSON.stringify({ limit, q })}`;
+      },
       merge: (currentCache, newItems) => {
         if (newItems.offset === 0) return newItems;
         return {
