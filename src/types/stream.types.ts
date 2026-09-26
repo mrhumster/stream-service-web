@@ -18,7 +18,10 @@ export interface UpdateStreamRequest {
   description?: string;
   visibility?: StreamVisibility;
   tags?: string[];
+  rotation?: Rotation;
 }
+
+export type Rotation = 0 | 90 | 180 | 270;
 
 export interface StreamMetadata {
   duration: number;
@@ -28,6 +31,7 @@ export interface StreamMetadata {
   recorded_at?: string;
   location?: string;
   camera?: string;
+  rotation?: number;
 }
 
 export interface StreamStorage {

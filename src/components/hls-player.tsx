@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Lock } from "pixelarticons/react";
 import { useRegisterViewMutation } from "@/services/stats";
 import { ReactionBar } from "@/components/player/reaction-bar";
+import type { Rotation } from "@/types/stream.types";
 import {
   Play,
   Pause,
@@ -52,10 +53,14 @@ export const HLSPlayer = ({
   src,
   autoplay = true,
   streamId,
+  initialRotation = 0,
+  onRotationChange,
 }: {
   src: string;
   autoplay?: boolean;
   streamId?: string;
+  initialRotation?: number;
+  onRotationChange?: (rotation: Rotation) => void;
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const bgVideoRef = useRef<HTMLVideoElement>(null);
@@ -63,11 +68,24 @@ export const HLSPlayer = ({
   const registeredFor = useRef<string | null>(null);
   const [registerView] = useRegisterViewMutation();
   const { isAuth, token, isInitializing } = useAuth();
+  const [rotation, setRotation] = useState<Rotation>(() =>
+    (initialRotation as Rotation) ?? 0,
+  );
+  // Follow external rotation changes (e.g. the Edit form selector) while the
+  // player is mounted for live preview.
+  const [prevRotation, setPrevRotation] = useState<number | undefined>(
+    initialRotation,
+  );
+  if (prevRotation !== initialRotation) {
+    setPrevRotation(initialRotation);
+    setRotation((initialRotation as Rotation) ?? 0);
+  }
   const [isForbidden, setIsForbidden] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [videoAspect, setVideoAspect] = useState<number | null>(null);
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
   const [isWide, setIsWide] = useState(false);
@@ -160,6 +178,14 @@ export const HLSPlayer = ({
     setIsWide((v) => !v);
   }, []);
 
+  const rotateView = useCallback(() => {
+    setRotation((prev) => {
+      const next = ((prev + 90) % 360) as Rotation;
+      onRotationChange?.(next);
+      return next;
+    });
+  }, [onRotationChange]);
+
   const seekBy = (delta: number) => {
     const video = videoRef.current;
     if (!video) return;
@@ -237,6 +263,10 @@ export const HLSPlayer = ({
         case "H":
           setShowHelp((v) => !v);
           break;
+        case "r":
+        case "R":
+          rotateView();
+          break;
         case "Escape":
           if (showHelp) setShowHelp(false);
           else if (isWide) setIsWide(false);
@@ -245,7 +275,7 @@ export const HLSPlayer = ({
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [isHovered, isFocused, isWide, showHelp, toggleWide]);
+  }, [isHovered, isFocused, isWide, showHelp, toggleWide, rotateView]);
 
   useEffect(() => {
     if (isInitializing) return;
@@ -324,6 +354,77 @@ export const HLSPlayer = ({
     );
   }
 
+  const sourceAspect = videoAspect ?? 16 / 9;
+  const portrait = rotation % 180 !== 0;
+  const boxAspect = videoAspect
+    ? portrait
+      ? 1 / videoAspect
+      : videoAspect
+    : portrait
+      ? 9 / 16
+      : 16 / 9;
+
+  const mainVideo = (
+    <video
+      ref={videoRef}
+      className="w-full h-full object-contain cursor-pointer"
+      autoPlay={autoplay}
+      playsInline
+      onClick={() => {
+        if (isTouch) {
+          setShowControls((v) => !v);
+          return;
+        }
+        togglePlay();
+      }}
+      onPlay={() => {
+        setIsPlaying(true);
+        bgVideoRef.current?.play().catch(() => undefined);
+      }}
+      onPause={() => {
+        setIsPlaying(false);
+        if (bgVideoRef.current && !bgVideoRef.current.paused) {
+          bgVideoRef.current.pause();
+        }
+      }}
+      onTimeUpdate={(e) => {
+        const video = e.currentTarget;
+        setCurrentTime(video.currentTime);
+        if (bgVideoRef.current) {
+          bgVideoRef.current.currentTime = video.currentTime;
+        }
+        // A view is counted only after the viewer has actually watched at
+        // least 80% of the stream (VIEW_THRESHOLD). This keeps the counter
+        // honest for real watchers while still catching most drive-bys.
+        if (
+          streamId &&
+          registeredFor.current !== streamId &&
+          Number.isFinite(video.duration) &&
+          video.duration > 0 &&
+          video.currentTime / video.duration >= VIEW_THRESHOLD
+        ) {
+          registeredFor.current = streamId;
+          registerView(streamId).catch(() => {
+            // view registration is best-effort; ignore failures
+          });
+        }
+      }}
+      onLoadedMetadata={(e) => {
+        const video = e.currentTarget;
+        setDuration(video.duration);
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
+        if (vw > 0 && vh > 0) {
+          setVideoAspect(vw / vh);
+        }
+      }}
+      onVolumeChange={(e) => {
+        setVolume(e.currentTarget.volume);
+        setIsMuted(e.currentTarget.muted);
+      }}
+    />
+  );
+
   return (
     <div
       key={`${src}-${isAuth}`}
@@ -336,8 +437,9 @@ export const HLSPlayer = ({
       className={`group outline-none w-full overflow-hidden ${
         isWide
           ? "fixed inset-0 z-50 h-[100dvh] w-screen overflow-hidden overscroll-none touch-none bg-zinc-950 flex items-center justify-center"
-          : "relative aspect-video bg-zinc-950 rounded-none"
+          : "relative bg-zinc-950 rounded-none"
       }`}
+      style={isWide ? undefined : { aspectRatio: `${boxAspect}` }}
     >
       {!hlsSupported ? (
         <div className="flex flex-col items-center justify-center w-full h-full p-6 text-center">
@@ -418,6 +520,10 @@ export const HLSPlayer = ({
                     <kbd className="bg-muted px-1.5 py-0.5 border border-foreground/20">H</kbd>
                   </li>
                   <li className="flex items-center justify-between gap-3">
+                    <span>Rotate view</span>
+                    <kbd className="bg-muted px-1.5 py-0.5 border border-foreground/20">R</kbd>
+                  </li>
+                  <li className="flex items-center justify-between gap-3">
                     <span>Close help / exit wide</span>
                     <kbd className="bg-muted px-1.5 py-0.5 border border-foreground/20">ESC</kbd>
                   </li>
@@ -427,61 +533,32 @@ export const HLSPlayer = ({
           )}
           <video
             ref={bgVideoRef}
-            className="absolute inset-0 w-full h-full object-cover blur-2xl scale-110 pointer-events-none"
+            className="absolute inset-0 w-full h-full object-cover blur-2xl pointer-events-none"
+            style={{
+              transform: isWide
+                ? `rotate(${rotation}deg) scale(1.1)`
+                : "scale(1.1)",
+            }}
             muted
             playsInline
             autoPlay={autoplay}
           />
-          <video
-            ref={videoRef}
-            className="relative z-10 w-full h-full max-h-[inherit] object-contain cursor-pointer"
-            autoPlay={autoplay}
-            playsInline
-            onClick={() => {
-              if (isTouch) {
-                setShowControls((v) => !v);
-                return;
-              }
-              togglePlay();
+          <div
+            className="absolute top-1/2 left-1/2 z-10"
+            style={{
+              transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
+              width: isWide
+                ? portrait
+                  ? `min(${sourceAspect * 100}vw, 100dvh)`
+                  : `min(100vw, ${sourceAspect * 100}dvh)`
+                : portrait
+                  ? `${sourceAspect * 100}%`
+                  : "100%",
+              aspectRatio: `${sourceAspect}`,
             }}
-            onPlay={() => {
-              setIsPlaying(true);
-              bgVideoRef.current?.play().catch(() => undefined);
-            }}
-            onPause={() => {
-              setIsPlaying(false);
-              if (bgVideoRef.current && !bgVideoRef.current.paused) {
-                bgVideoRef.current.pause();
-              }
-            }}
-            onTimeUpdate={(e) => {
-              const video = e.currentTarget;
-              setCurrentTime(video.currentTime);
-              if (bgVideoRef.current) {
-                bgVideoRef.current.currentTime = video.currentTime;
-              }
-              // A view is counted only after the viewer has actually watched at
-              // least 80% of the stream (VIEW_THRESHOLD). This keeps the counter
-              // honest for real watchers while still catching most drive-bys.
-              if (
-                streamId &&
-                registeredFor.current !== streamId &&
-                Number.isFinite(video.duration) &&
-                video.duration > 0 &&
-                video.currentTime / video.duration >= VIEW_THRESHOLD
-              ) {
-                registeredFor.current = streamId;
-                registerView(streamId).catch(() => {
-                  // view registration is best-effort; ignore failures
-                });
-              }
-            }}
-            onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
-            onVolumeChange={(e) => {
-              setVolume(e.currentTarget.volume);
-              setIsMuted(e.currentTarget.muted);
-            }}
-          />
+          >
+            {mainVideo}
+          </div>
 
           {/* Custom Controls */}
           <div className={`absolute bottom-0 inset-x-0 z-10 px-2 pb-1.5 pt-4 sm:px-3 sm:pb-2 sm:pt-8 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-200 ${
@@ -573,6 +650,14 @@ export const HLSPlayer = ({
                 className="hidden md:inline-flex cursor-pointer text-white hover:text-zinc-300 transition-colors shrink-0"
               >
                 <Keyboard className="size-5" />
+              </button>
+
+              <button
+                onClick={rotateView}
+                title="Rotate view (R)"
+                className="cursor-pointer text-white hover:text-zinc-300 transition-colors shrink-0"
+              >
+                <RotateCw className="size-5" />
               </button>
 
               <button

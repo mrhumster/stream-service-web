@@ -11,7 +11,11 @@ import { useGetStreamQuery, useUpdateStreamMutation } from "@/services/streams"
 import { useAppSelector } from "@/hooks"
 import { cn, getErrorMessage } from "@/lib/utils"
 import { ArrowLeft, Lock, X } from "lucide-react"
-import type { StreamResponse, StreamVisibility } from "@/types/stream.types"
+import type {
+  Rotation,
+  StreamResponse,
+  StreamVisibility,
+} from "@/types/stream.types"
 
 const inputClassName =
   "border-4 border-black rounded-none focus-visible:ring-0 focus-visible:border-primary"
@@ -27,6 +31,9 @@ function EditStreamForm({ stream }: { stream: StreamResponse }) {
   const [tagInput, setTagInput] = useState("")
   const [visibility, setVisibility] = useState<StreamVisibility>(
     stream.visibility,
+  )
+  const [rotation, setRotation] = useState<Rotation>(
+    (stream.metadata?.rotation as Rotation) ?? 0,
   )
 
   const handleTagKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -49,7 +56,7 @@ function EditStreamForm({ stream }: { stream: StreamResponse }) {
     try {
       await updateStream({
         id: stream.id,
-        body: { title, description, visibility, tags },
+        body: { title, description, visibility, tags, rotation },
       }).unwrap()
       navigate(`/streams/${stream.id}`)
     } catch (err) {
@@ -62,7 +69,14 @@ function EditStreamForm({ stream }: { stream: StreamResponse }) {
 
   return (
     <div className="flex flex-col gap-6">
-      {isReady && videoUrl && <HLSPlayer src={videoUrl} autoplay={autoplay} />}
+      {isReady && videoUrl && (
+        <HLSPlayer
+          src={videoUrl}
+          autoplay={autoplay}
+          initialRotation={rotation}
+          onRotationChange={setRotation}
+        />
+      )}
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       {/* Title */}
       <div className="flex flex-col gap-2">
@@ -150,6 +164,28 @@ function EditStreamForm({ stream }: { stream: StreamResponse }) {
               )}
             >
               {v}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Rotation */}
+      <div className="flex flex-col gap-2">
+        <Label className="text-[10px] uppercase">Orientation</Label>
+        <div className="flex gap-2">
+          {([0, 90, 180, 270] as const).map((r) => (
+            <button
+              key={r}
+              type="button"
+              onClick={() => setRotation(r)}
+              className={cn(
+                "px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors",
+                rotation === r
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80",
+              )}
+            >
+              {r}°
             </button>
           ))}
         </div>

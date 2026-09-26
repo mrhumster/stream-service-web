@@ -273,7 +273,12 @@ export const StreamPage = () => {
                     {videoError}
                   </span>
                 ) : videoUrl ? (
-                  <HLSPlayer src={videoUrl} autoplay={autoplay} streamId={id} />
+                  <HLSPlayer
+                    src={videoUrl}
+                    autoplay={autoplay}
+                    streamId={id}
+                    initialRotation={stream.metadata?.rotation ?? 0}
+                  />
                 ) : null}
               </div>
             </Card>
