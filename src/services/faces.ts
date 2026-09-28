@@ -23,6 +23,8 @@ import type {
   DetachStreamFaceResponse,
   FaceListParams,
   FacesSuggestResponse,
+  BatchDeleteFacesRequest,
+  BatchDeleteFacesResponse,
 } from "../types/face.types.ts";
 
 const baseQuery = fetchBaseQuery({
@@ -261,6 +263,28 @@ export const facesApi = createApi({
         { type: "Faces" as const, id: "LIST" },
       ],
     }),
+    deleteFacesBatch: builder.mutation<
+      BatchDeleteFacesResponse,
+      BatchDeleteFacesRequest
+    >({
+      query: (body) => ({
+        url: "faces/delete-batch",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_res, _err, { cluster_ids }) => [
+        { type: "Faces" as const, id: "LIST" },
+        ...cluster_ids.map((id) => ({ type: "Faces" as const, id })),
+      ],
+      async onQueryStarted(_args, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          dispatch(streamApi.util.invalidateTags(["Stream"]));
+        } catch {
+          // nothing to roll back
+        }
+      },
+    }),
   }),
 });
 
@@ -276,4 +300,5 @@ export const {
   useMergeFacesMutation,
   useDeleteEmptyFacesMutation,
   useDetachFaceFromStreamMutation,
+  useDeleteFacesBatchMutation,
 } = facesApi;

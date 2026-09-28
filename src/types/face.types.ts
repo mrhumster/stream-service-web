@@ -71,6 +71,14 @@ export interface DeleteEmptyFacesResponse {
   deleted: number;
 }
 
+export interface BatchDeleteFacesRequest {
+  cluster_ids: string[];
+}
+
+export interface BatchDeleteFacesResponse {
+  deleted: number;
+}
+
 export interface DetachStreamFaceResponse {
   cluster_id: string;
   stream_id: string;

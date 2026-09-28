@@ -22,6 +22,7 @@ import {
   useDeleteFaceMutation,
   useMergeFacesMutation,
   useDeleteEmptyFacesMutation,
+  useDeleteFacesBatchMutation,
 } from "@/services/faces";
 import { FaceCrop } from "@/components/faces/face-crop";
 import { formatPercent, SIMILARITY_THRESHOLD } from "@/lib/face-similarity";
@@ -239,12 +240,15 @@ export const PeoplePage = () => {
   const [mergeFaces, { isLoading: merging }] = useMergeFacesMutation();
   const [deleteEmptyFaces, { isLoading: deletingEmpty }] =
     useDeleteEmptyFacesMutation();
+  const [deleteFacesBatch, { isLoading: deletingBatch }] =
+    useDeleteFacesBatchMutation();
 
   const [mergeMode, setMergeMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleteTarget, setDeleteTarget] = useState<Person | null>(null);
   const [confirmMerge, setConfirmMerge] = useState(false);
   const [confirmDeleteEmpty, setConfirmDeleteEmpty] = useState(false);
+  const [confirmDeleteBatch, setConfirmDeleteBatch] = useState(false);
 
   const clusters: FacesListResponse["clusters"] | undefined = data?.clusters;
 
@@ -327,6 +331,26 @@ export const PeoplePage = () => {
     [selected],
   );
 
+  const selectedPeople = useMemo(
+    () => (clusters ?? []).filter((c) => selected.has(c.id)),
+    [clusters, selected],
+  );
+
+  const deleteBatchSamples = useMemo(
+    () => selectedPeople.reduce((sum, c) => sum + c.sample_count, 0),
+    [selectedPeople],
+  );
+
+  const deleteBatchStreams = useMemo(
+    () =>
+      new Set(
+        selectedPeople.flatMap((c) =>
+          (c.videos ?? []).map((v) => v.stream_id),
+        ),
+      ).size,
+    [selectedPeople],
+  );
+
   const toggle = (id: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -400,6 +424,25 @@ export const PeoplePage = () => {
     }
   };
 
+  const runDeleteBatch = async () => {
+    if (sortedSelected.length < 1) return;
+    try {
+      const res = await deleteFacesBatch({
+        cluster_ids: sortedSelected,
+      }).unwrap();
+      toast.success(
+        `Deleted ${res.deleted} ${res.deleted === 1 ? "person" : "people"}`,
+      );
+      setSelected(new Set());
+      setConfirmDeleteBatch(false);
+      setOffset(0);
+    } catch (err) {
+      const detail = (err as { data?: { detail?: string } } | undefined)?.data
+        ?.detail;
+      toast.error(detail ? `Failed: ${detail}` : "Failed to delete people");
+    }
+  };
+
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
@@ -449,23 +492,39 @@ export const PeoplePage = () => {
         </div>
       )}
 
-      {mergeMode && (
-        <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 mb-4 px-2 py-2 bg-card border-4 border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+      <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 mb-4 px-2 py-2 bg-card border-4 border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+        {mergeMode ? (
+          <>
+            <span className="text-[10px] uppercase font-bold text-muted-foreground">
+              {sortedSelected.length} selected
+            </span>
+            <button
+              type="button"
+              disabled={sortedSelected.length < 2 || merging}
+              onClick={() => setConfirmMerge(true)}
+              aria-label="Merge selected people"
+              className={pixelBtn}
+            >
+              <Merge className="size-3.5" />
+              {merging ? "Merging..." : `Merge ${sortedSelected.length}`}
+            </button>
+            <button
+              type="button"
+              disabled={sortedSelected.length < 1 || deletingBatch}
+              onClick={() => setConfirmDeleteBatch(true)}
+              aria-label="Delete selected people"
+              className={pixelBtnDestructive}
+            >
+              <Delete className="size-3.5" />
+              {deletingBatch ? "Deleting..." : `Delete ${sortedSelected.length}`}
+            </button>
+          </>
+        ) : (
           <span className="text-[10px] uppercase font-bold text-muted-foreground">
-            {sortedSelected.length} selected
+            Select people to merge or delete — press Merge mode
           </span>
-          <button
-            type="button"
-            disabled={sortedSelected.length < 2 || merging}
-            onClick={() => setConfirmMerge(true)}
-            aria-label="Merge selected people"
-            className={pixelBtn}
-          >
-            <Merge className="size-3.5" />
-            {merging ? "Merging..." : `Merge ${sortedSelected.length}`}
-          </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {isLoading && (
         <div className="flex justify-center py-12">
@@ -589,7 +648,45 @@ export const PeoplePage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    <Dialog open={confirmDeleteEmpty} onOpenChange={setConfirmDeleteEmpty}>
+
+      <Dialog
+        open={confirmDeleteBatch}
+        onOpenChange={setConfirmDeleteBatch}
+      >
+        <DialogContent className="border-4 border-primary shadow-[8px_8px_0_0_rgba(0,0,0,1)] rounded-none max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-sm uppercase tracking-wider">
+              Delete {sortedSelected.length}{" "}
+              {sortedSelected.length === 1 ? "person" : "people"}?
+            </DialogTitle>
+            <DialogDescription className="text-xs uppercase tracking-wider">
+This will remove {deleteBatchSamples} sample
+            {deleteBatchSamples === 1 ? "" : "s"} across {deleteBatchStreams}{" "}
+            stream{deleteBatchStreams === 1 ? "" : "s"} and allow re-detection
+            on affected streams. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              type="button"
+              className={pixelBtnOutline}
+              onClick={() => setConfirmDeleteBatch(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className={pixelBtnDestructive}
+              disabled={deletingBatch}
+              onClick={() => void runDeleteBatch()}
+            >
+              {deletingBatch ? "Deleting..." : "Delete"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={confirmDeleteEmpty} onOpenChange={setConfirmDeleteEmpty}>
         <DialogContent className="border-4 border-primary shadow-[8px_8px_0_0_rgba(0,0,0,1)] rounded-none max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-sm uppercase tracking-wider">
