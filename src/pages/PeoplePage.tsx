@@ -33,6 +33,7 @@ import type {
 } from "@/types/face.types";
 
 const PAGE_SIZE = 50;
+const BATCH_DELETE_CHUNK_SIZE = 100;
 
 const pixelBtnOutline =
   "inline-flex items-center justify-center gap-2 bg-card text-card-foreground hover:bg-accent border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold";
@@ -426,21 +427,29 @@ export const PeoplePage = () => {
 
   const runDeleteBatch = async () => {
     if (sortedSelected.length < 1) return;
-    try {
-      const res = await deleteFacesBatch({
-        cluster_ids: sortedSelected,
-      }).unwrap();
-      toast.success(
-        `Deleted ${res.deleted} ${res.deleted === 1 ? "person" : "people"}`,
-      );
-      setSelected(new Set());
-      setConfirmDeleteBatch(false);
-      setOffset(0);
-    } catch (err) {
-      const detail = (err as { data?: { detail?: string } } | undefined)?.data
-        ?.detail;
-      toast.error(detail ? `Failed: ${detail}` : "Failed to delete people");
+    let deleted = 0;
+    let failedChunks = 0;
+    for (let i = 0; i < sortedSelected.length; i += BATCH_DELETE_CHUNK_SIZE) {
+      const chunk = sortedSelected.slice(i, i + BATCH_DELETE_CHUNK_SIZE);
+      try {
+        const res = await deleteFacesBatch({ cluster_ids: chunk }).unwrap();
+        deleted += res.deleted;
+      } catch {
+        failedChunks += 1;
+      }
     }
+    if (failedChunks > 0) {
+      toast.error(
+        `Deleted ${deleted}, ${failedChunks} ${failedChunks === 1 ? "batch" : "batches"} failed`,
+      );
+    } else {
+      toast.success(
+        `Deleted ${deleted} ${deleted === 1 ? "person" : "people"}`,
+      );
+    }
+    setSelected(new Set());
+    setConfirmDeleteBatch(false);
+    setOffset(0);
   };
 
   return (
