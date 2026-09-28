@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { Link } from "react-router-dom";
-import { Loader2, Sparkles, Copy, Delete, Merge, Users as UsersIcon } from "lucide-react";
+import { Loader2, Sparkles, Copy, Delete, Merge, SquareCheckBig, Users as UsersIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -96,7 +96,7 @@ type Person = FaceClusterWithStats;
 
 interface PersonRowProps {
   person: Person;
-  mergeMode: boolean;
+  selectionMode: boolean;
   selected: boolean;
   onToggle: (id: string) => void;
   similar?: number;
@@ -107,7 +107,7 @@ interface PersonRowProps {
 
 function PersonRow({
   person: c,
-  mergeMode,
+  selectionMode,
   selected,
   onToggle,
   similar,
@@ -117,7 +117,7 @@ function PersonRow({
 }: PersonRowProps) {
   return (
     <li className="flex items-center gap-2 border-4 bg-card text-foreground hover:bg-accent border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,1)] rounded-none px-4 py-3 transition-colors">
-      {mergeMode && (
+      {selectionMode && (
         <label className="inline-flex items-center shrink-0 cursor-pointer">
           <input
             type="checkbox"
@@ -158,7 +158,7 @@ function PersonRow({
       </Link>
       <Sparkles className="size-4 text-muted-foreground shrink-0" />
       {children}
-      {!mergeMode && onDelete && (
+      {!selectionMode && onDelete && (
         <button
           type="button"
           onClick={() => onDelete(c)}
@@ -174,14 +174,14 @@ function PersonRow({
 
 function SimilarGroupCard({
   group,
-  mergeMode,
+  selectionMode,
   selected,
   onToggle,
   onDelete,
   onSelectAll,
 }: {
   group: SimilarityGroup<Person>;
-  mergeMode: boolean;
+  selectionMode: boolean;
   selected: Set<string>;
   onToggle: (id: string) => void;
   onDelete: (person: Person) => void;
@@ -191,14 +191,14 @@ function SimilarGroupCard({
     <li className="border-4 bg-card border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,1)] rounded-none overflow-hidden">
       <PersonRow
         person={group.rep}
-        mergeMode={mergeMode}
+        selectionMode={selectionMode}
         selected={selected.has(group.rep.id)}
         onToggle={onToggle}
         similar={group.members.length}
         simLabel={formatPercent(group.maxSim)}
         onDelete={onDelete}
       >
-{mergeMode && (
+{selectionMode && (
           <button
             type="button"
             onClick={() => onSelectAll(group)}
@@ -215,7 +215,7 @@ function SimilarGroupCard({
           <PersonRow
             key={m.id}
             person={m}
-            mergeMode={mergeMode}
+            selectionMode={selectionMode}
             selected={selected.has(m.id)}
             onToggle={onToggle}
             similar={0}
@@ -243,7 +243,7 @@ export const PeoplePage = () => {
   const [deleteFacesBatch, { isLoading: deletingBatch }] =
     useDeleteFacesBatchMutation();
 
-  const [mergeMode, setMergeMode] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleteTarget, setDeleteTarget] = useState<Person | null>(null);
   const [confirmMerge, setConfirmMerge] = useState(false);
@@ -270,7 +270,7 @@ export const PeoplePage = () => {
 
   const rows =
     clusters && clusters.length > 0
-      ? mergeMode
+      ? selectionMode
         ? restClusters.map((c) => ({ cluster: c, similar: 0 }))
         : collapseDuplicates(restClusters)
       : [];
@@ -396,7 +396,7 @@ export const PeoplePage = () => {
       );
       setSelected(new Set());
       setConfirmMerge(false);
-      setMergeMode(false);
+      setSelectionMode(false);
       setOffset(0);
     } catch (err) {
       const detail = (err as { data?: { detail?: string } } | undefined)?.data
@@ -456,18 +456,6 @@ export const PeoplePage = () => {
               shown
             </span>
           )}
-          <button
-            type="button"
-            onClick={() => {
-              setMergeMode((m) => !m);
-              setSelected(new Set());
-            }}
-            aria-label={mergeMode ? "Exit merge mode" : "Merge mode"}
-            className="inline-flex items-center gap-2 border-2 border-black bg-card text-card-foreground hover:bg-accent px-3 py-1.5 text-[10px] uppercase font-bold shadow-[2px_2px_0_0_rgba(0,0,0,0.8)] active:shadow-none active:translate-x-[1px] active:translate-y-[1px] rounded-none"
-          >
-            <Merge className="size-3.5" />
-            {mergeMode ? "Cancel" : "Merge"}
-          </button>
         </div>
       </div>
 
@@ -493,9 +481,9 @@ export const PeoplePage = () => {
       )}
 
       <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 mb-4 px-2 py-2 bg-card border-4 border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
-        {mergeMode ? (
+        {selectionMode ? (
           <>
-            <span className="text-[10px] uppercase font-bold text-muted-foreground">
+            <span className="text-[10px] uppercase font-bold text-muted-foreground flex-1 min-w-[160px]">
               {sortedSelected.length} selected
             </span>
             <button
@@ -518,11 +506,36 @@ export const PeoplePage = () => {
               <Delete className="size-3.5" />
               {deletingBatch ? "Deleting..." : `Delete ${sortedSelected.length}`}
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectionMode(false);
+                setSelected(new Set());
+              }}
+              aria-label="Exit selection mode"
+              className={pixelBtnOutline}
+            >
+              Done
+            </button>
           </>
         ) : (
-          <span className="text-[10px] uppercase font-bold text-muted-foreground">
-            Select people to merge or delete — press Merge mode
+          <span className="text-[10px] uppercase font-bold text-muted-foreground flex-1 min-w-[160px]">
+            Select people to merge or delete
           </span>
+        )}
+        {!selectionMode && (
+          <button
+            type="button"
+            onClick={() => {
+              setSelectionMode(true);
+              setSelected(new Set());
+            }}
+            aria-label="Enable selection mode"
+            className={pixelBtn}
+          >
+            <SquareCheckBig className="size-3.5" />
+            Selection mode
+          </button>
         )}
       </div>
 
@@ -555,7 +568,7 @@ export const PeoplePage = () => {
               <SimilarGroupCard
                 key={g.rep.id}
                 group={g}
-                mergeMode={mergeMode}
+                selectionMode={selectionMode}
                 selected={selected}
                 onToggle={toggle}
                 onDelete={setDeleteTarget}
@@ -572,7 +585,7 @@ export const PeoplePage = () => {
             <PersonRow
               key={c.id}
               person={c}
-              mergeMode={mergeMode}
+              selectionMode={selectionMode}
               selected={selected.has(c.id)}
               onToggle={toggle}
               similar={similar}
