@@ -348,21 +348,22 @@ export const HLSPlayer = ({
     };
   }, [src, isAuth, token, isInitializing, hlsSupported]);
 
-  if (isInitializing) {
-    return (
-      <div className="w-full aspect-video bg-zinc-950 animate-pulse rounded-none" />
-    );
-  }
-
   const sourceAspect = videoAspect ?? 16 / 9;
   const portrait = rotation % 180 !== 0;
-  const boxAspect = videoAspect
-    ? portrait
-      ? 1 / videoAspect
-      : videoAspect
-    : portrait
-      ? 9 / 16
-      : 16 / 9;
+  const rootAspect = 16 / 9;
+  const immersive = isWide || isFullscreen;
+
+  if (isInitializing) {
+    return (
+      <div
+        className="w-full bg-zinc-950 animate-pulse rounded-none"
+        style={{
+          aspectRatio: `${rootAspect}`,
+          width: `min(100%, ${rootAspect * 70}vh)`,
+        }}
+      />
+    );
+  }
 
   const mainVideo = (
     <video
@@ -435,11 +436,18 @@ export const HLSPlayer = ({
       onFocus={() => setIsFocused(true)}
       onBlur={() => setIsFocused(false)}
       className={`group outline-none w-full overflow-hidden ${
-        isWide
+        immersive
           ? "fixed inset-0 z-50 h-[100dvh] w-screen overflow-hidden overscroll-none touch-none bg-zinc-950 flex items-center justify-center"
           : "relative bg-zinc-950 rounded-none"
       }`}
-      style={isWide ? undefined : { aspectRatio: `${boxAspect}` }}
+      style={
+        immersive
+          ? undefined
+          : {
+              aspectRatio: `${rootAspect}`,
+              width: `min(100%, ${rootAspect * 70}vh)`,
+            }
+      }
     >
       {!hlsSupported ? (
         <div className="flex flex-col items-center justify-center w-full h-full p-6 text-center">
@@ -535,7 +543,7 @@ export const HLSPlayer = ({
             ref={bgVideoRef}
             className="absolute inset-0 w-full h-full object-cover blur-2xl pointer-events-none"
             style={{
-              transform: isWide
+              transform: immersive
                 ? `rotate(${rotation}deg) scale(1.1)`
                 : "scale(1.1)",
             }}
@@ -547,13 +555,13 @@ export const HLSPlayer = ({
             className="absolute top-1/2 left-1/2 z-10"
             style={{
               transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
-              width: isWide
+              width: immersive
                 ? portrait
                   ? `min(${sourceAspect * 100}vw, 100dvh)`
                   : `min(100vw, ${sourceAspect * 100}dvh)`
                 : portrait
-                  ? `${sourceAspect * 100}%`
-                  : "100%",
+                  ? `min(${sourceAspect * 100}%, ${100 / rootAspect}%)`
+                  : `min(100%, ${(sourceAspect * 100) / rootAspect}%)`,
               aspectRatio: `${sourceAspect}`,
             }}
           >
