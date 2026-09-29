@@ -407,11 +407,21 @@ export const HLSPlayer = ({
           faceAssistState.onPause(videoRef.current);
         }
       }}
+      onSeeked={(e) => {
+        // Seeking while paused fires no `pause`, so the face boxes would keep
+        // pointing at the previous frame. Re-detect for the new picture.
+        if (faceAssistState.enabled) {
+          faceAssistState.onSeeked(e.currentTarget);
+        }
+      }}
       onTimeUpdate={(e) => {
         const video = e.currentTarget;
         setCurrentTime(video.currentTime);
         if (bgVideoRef.current) {
           bgVideoRef.current.currentTime = video.currentTime;
+        }
+        if (faceAssistState.enabled) {
+          faceAssistState.onTimeCheck(video);
         }
         // A view is counted only after the viewer has actually watched at
         // least 80% of the stream (VIEW_THRESHOLD). This keeps the counter
@@ -585,6 +595,11 @@ export const HLSPlayer = ({
             }}
           >
             {mainVideo}
+            {faceAssistState.isScanning && (
+              <span className="pointer-events-none absolute left-2 top-2 z-20 border-2 border-black bg-card px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-card-foreground shadow-[2px_2px_0_0_rgba(0,0,0,0.8)]">
+                Scanning faces...
+              </span>
+            )}
             {faceAssistState.frame && (
               <FrameFaceOverlay
                 faces={faceAssistState.frame.faces}

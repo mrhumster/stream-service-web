@@ -17,8 +17,17 @@ import type { DetectedFrameFace } from "@/types/face.types";
  * and it keeps the request small. Boxes come back in these pixels. */
 const MAX_CAPTURE_WIDTH = 1280;
 const JPEG_QUALITY = 0.85;
-/** pausing repeatedly (scrubbing) must not queue a request per gesture */
-const PAUSE_DEBOUNCE_MS = 600;
+/**
+ * `requestVideoFrameCallback` only fires when a *new* frame is presented — on a
+ * plain pause none ever is, so waiting on it alone left the detection hanging
+ * until playback resumed (and the boxes then landed on the wrong picture). We
+ * race it against this watchdog: after a seek the callback usually wins and we
+ * get the freshly painted frame, on a plain pause the timer wins and the frame
+ * on screen is already the one we want.
+ */
+const CAPTURE_WATCHDOG_MS = 150;
+/** scrubbing must not queue a detection per gesture */
+const MIN_DETECT_INTERVAL_MS = 700;
 /** re-pausing on the same moment is a no-op (the occurrence would dedup anyway) */
 const SAME_FRAME_EPSILON = 0.5;
 /** how long a confirmed box stays green before it disappears */
@@ -89,11 +98,14 @@ export const useFrameFaceAssist = ({
   const [frame, setFrame] = useState<CapturedFrame | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [resolvedKey, setResolvedKey] = useState<string | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
 
   const frameRef = useRef<CapturedFrame | null>(null);
   const lastTRef = useRef<number | null>(null);
   const inFlightRef = useRef(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastRequestAtRef = useRef(0);
+  const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const throttleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flashRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clear = useCallback(() => {
@@ -131,16 +143,36 @@ export const useFrameFaceAssist = ({
   const runDetect = useCallback(
     async (video: HTMLVideoElement) => {
       const t = video.currentTime;
-      if (inFlightRef.current) return;
+      if (inFlightRef.current || !video.paused) return;
       if (lastTRef.current !== null && Math.abs(lastTRef.current - t) < SAME_FRAME_EPSILON) {
         return;
       }
+      lastRequestAtRef.current = Date.now();
       inFlightRef.current = true;
       lastTRef.current = t;
+      setIsScanning(true);
+      const startedAt = performance.now();
       try {
         const captured = await captureFrame(video);
         if (!captured) return;
+        const encodedAt = performance.now();
         const res = await detect({ file: captured.blob }).unwrap();
+        const answeredAt = performance.now();
+
+        // The picture may have moved on while we waited: a seek or a resume
+        // invalidates these boxes, they belong to the frame we just sent.
+        if (!video.paused || Math.abs(video.currentTime - t) > SAME_FRAME_EPSILON) {
+          return;
+        }
+
+        // one line to read in devtools: where the wait actually goes
+        console.debug(
+          `[face-assist] t=${t.toFixed(2)}s faces=${res.faces.length} ` +
+            `capture+encode=${Math.round(encodedAt - startedAt)}ms ` +
+            `upload+infer=${Math.round(answeredAt - encodedAt)}ms ` +
+            `total=${Math.round(answeredAt - startedAt)}ms`,
+        );
+
         if (res.faces.length === 0) {
           commit(null);
           return;
@@ -185,35 +217,103 @@ export const useFrameFaceAssist = ({
         }
       } finally {
         inFlightRef.current = false;
+        setIsScanning(false);
       }
     },
     [attach, commit, detect, resolveFace, streamId],
   );
 
-  /* `pause` can fire before the seeked frame is actually painted; when the
-   * browser offers requestVideoFrameCallback we capture the real frame,
-   * otherwise we wait a tick so the decoder has caught up. */
-  const onPause = useCallback(
+  /* Grab the frame once it is actually on screen. requestVideoFrameCallback
+   * gives us the freshly painted frame after a seek; the watchdog covers the
+   * plain-pause case, where no new frame will ever be presented. */
+  const captureWhenPainted = useCallback(
     (video: HTMLVideoElement) => {
-      if (!enabled) return;
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      const run = () => void runDetect(video);
+      if (watchdogRef.current) clearTimeout(watchdogRef.current);
+      let done = false;
+      const fire = () => {
+        if (done) return;
+        done = true;
+        if (watchdogRef.current) clearTimeout(watchdogRef.current);
+        // Scrubbing fires this faster than the server should be hammered, but
+        // dropping the request outright would leave the owner staring at a bare
+        // frame. Coalesce instead: one trailing detection for where they
+        // stopped.
+        const wait =
+          MIN_DETECT_INTERVAL_MS - (Date.now() - lastRequestAtRef.current);
+        if (wait > 0) {
+          if (throttleRef.current) clearTimeout(throttleRef.current);
+          throttleRef.current = setTimeout(() => {
+            throttleRef.current = null;
+            void runDetect(video);
+          }, wait);
+          return;
+        }
+        void runDetect(video);
+      };
+      watchdogRef.current = setTimeout(fire, CAPTURE_WATCHDOG_MS);
       const rvfc = (
         video as HTMLVideoElement & {
           requestVideoFrameCallback?: (cb: () => void) => number;
         }
       ).requestVideoFrameCallback;
       if (typeof rvfc === "function") {
-        rvfc.call(video, run);
-      } else {
-        debounceRef.current = setTimeout(run, PAUSE_DEBOUNCE_MS);
+        rvfc.call(video, fire);
+      } else if (video.readyState >= 2) {
+        // no rvfc and the picture is already there — nothing to wait for
+        fire();
       }
     },
-    [enabled, runDetect],
+    [runDetect],
+  );
+
+  const onPause = useCallback(
+    (video: HTMLVideoElement) => {
+      if (!enabled) return;
+      // the old boxes belong to a different frame, they must not linger
+      clear();
+      lastTRef.current = null;
+      if (video.seeking) {
+        // the seek has not landed yet; onSeeked will pick this up
+        return;
+      }
+      captureWhenPainted(video);
+    },
+    [captureWhenPainted, clear, enabled],
+  );
+
+  /* Seeking while paused never fires `pause` again, so this is the trigger that
+   * keeps the boxes glued to the picture while the owner scrubs. */
+  const onSeeked = useCallback(
+    (video: HTMLVideoElement) => {
+      if (!enabled || !video.paused) return;
+      clear();
+      lastTRef.current = null;
+      captureWhenPainted(video);
+    },
+    [captureWhenPainted, clear, enabled],
+  );
+
+  /* Safety net only: drop boxes whose frame is no longer the one on screen.
+   * Deliberately does not trigger a detection — onSeeked already did that. */
+  const onTimeCheck = useCallback(
+    (video: HTMLVideoElement) => {
+      if (!enabled) return;
+      const current = frameRef.current;
+      if (!current || !video.paused) return;
+      if (Math.abs(video.currentTime - current.tSeconds) > SAME_FRAME_EPSILON) {
+        clear();
+      }
+    },
+    [clear, enabled],
   );
 
   const onPlay = useCallback(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (watchdogRef.current) clearTimeout(watchdogRef.current);
+    // a queued detection must not fire against a moving picture
+    if (throttleRef.current) {
+      clearTimeout(throttleRef.current);
+      throttleRef.current = null;
+    }
     clear();
     lastTRef.current = null;
   }, [clear]);
@@ -224,7 +324,8 @@ export const useFrameFaceAssist = ({
 
   useEffect(
     () => () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (watchdogRef.current) clearTimeout(watchdogRef.current);
+      if (throttleRef.current) clearTimeout(throttleRef.current);
       if (flashRef.current) clearTimeout(flashRef.current);
     },
     [],
@@ -275,6 +376,7 @@ export const useFrameFaceAssist = ({
   return {
     enabled,
     isDetecting,
+    isScanning,
     frame,
     busyKey,
     resolvedKey,
@@ -282,6 +384,8 @@ export const useFrameFaceAssist = ({
     reject,
     clear,
     onPause,
+    onSeeked,
+    onTimeCheck,
     onPlay,
   };
 };
