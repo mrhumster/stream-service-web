@@ -153,6 +153,8 @@ export interface DetectFrameResponse {
   /** dimensions of the frame that was analysed (the client may have downscaled) */
   width: number;
   height: number;
+  /** server-side handling time, so the client can tell network from inference */
+  took_ms: number;
 }
 
 export interface AttachFrameFaceResponse {

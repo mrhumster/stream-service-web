@@ -13,10 +13,12 @@ import type { DetectedFrameFace } from "@/types/face.types";
  * The capture works without `crossOrigin` because the player always plays
  * through hls.js/MSE (the <video> src is a blob: URL) — see hls-player.tsx. */
 
-/** Frames are downscaled before upload: the detector resizes to 640x640 anyway,
- * and it keeps the request small. Boxes come back in these pixels. */
-const MAX_CAPTURE_WIDTH = 1280;
-const JPEG_QUALITY = 0.85;
+/** Frames are downscaled before upload. The detector (SCRFD) rescales the long
+ * side to det_size=640 and pads to 640x640 before it looks at anything
+ * (scrfd.py:224-235), so pixels past that are pure upload cost: 1280px bought
+ * nothing and cost ~200 kB. 720 keeps a little headroom for small faces. */
+const MAX_CAPTURE_WIDTH = 720;
+const JPEG_QUALITY = 0.75;
 /**
  * `requestVideoFrameCallback` only fires when a *new* frame is presented — on a
  * plain pause none ever is, so waiting on it alone left the detection hanging
@@ -166,10 +168,12 @@ export const useFrameFaceAssist = ({
         }
 
         // one line to read in devtools: where the wait actually goes
+        const server = Math.round(res.took_ms);
         console.debug(
           `[face-assist] t=${t.toFixed(2)}s faces=${res.faces.length} ` +
             `capture+encode=${Math.round(encodedAt - startedAt)}ms ` +
-            `upload+infer=${Math.round(answeredAt - encodedAt)}ms ` +
+            `upload=${Math.round(answeredAt - encodedAt - server)}ms ` +
+            `server=${server}ms ` +
             `total=${Math.round(answeredAt - startedAt)}ms`,
         );
 
