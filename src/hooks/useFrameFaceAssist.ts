@@ -167,9 +167,10 @@ export const useFrameFaceAssist = ({
           return;
         }
 
-        // one line to read in devtools: where the wait actually goes
+        // console.log, not console.debug: DevTools hides Verbose by default, so
+        // the timings were invisible in the browser while running fine.
         const server = Math.round(res.took_ms);
-        console.debug(
+        console.log(
           `[face-assist] t=${t.toFixed(2)}s faces=${res.faces.length} ` +
             `capture+encode=${Math.round(encodedAt - startedAt)}ms ` +
             `upload=${Math.round(answeredAt - encodedAt - server)}ms ` +
