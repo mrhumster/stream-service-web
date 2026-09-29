@@ -25,6 +25,8 @@ import type {
   FacesSuggestResponse,
   BatchDeleteFacesRequest,
   BatchDeleteFacesResponse,
+  DetectFrameResponse,
+  AttachFrameFaceResponse,
 } from "../types/face.types.ts";
 
 const baseQuery = fetchBaseQuery({
@@ -285,6 +287,61 @@ export const facesApi = createApi({
         }
       },
     }),
+
+    /* --- interactive frame assist (paused-frame detection) --- */
+
+    detectFrame: builder.mutation<
+      DetectFrameResponse,
+      { file: File | Blob; filename?: string }
+    >({
+      query: ({ file, filename }) => {
+        const form = new FormData();
+        form.append("file", file, filename ?? "frame.jpg");
+        return { url: "faces/detect", method: "POST", body: form };
+      },
+    }),
+
+    attachFrameFace: builder.mutation<
+      AttachFrameFaceResponse,
+      {
+        streamId: string;
+        file: File | Blob;
+        filename?: string;
+        bbox: [number, number, number, number];
+        tSeconds: number;
+        /** omitted/empty -> create a new anonymous person */
+        clusterId?: string;
+      }
+    >({
+      query: ({ streamId, file, filename, bbox, tSeconds, clusterId }) => {
+        const form = new FormData();
+        form.append("file", file, filename ?? "frame.jpg");
+        form.append("bbox", bbox.map((v) => Math.round(v)).join(","));
+        form.append("t_seconds", String(tSeconds));
+        if (clusterId) form.append("cluster_id", clusterId);
+        return {
+          url: `streams/${streamId}/faces/attach`,
+          method: "POST",
+          body: form,
+        };
+      },
+      invalidatesTags: (_res, _err, { clusterId }) =>
+        clusterId
+          ? [
+              { type: "Faces" as const, id: "LIST" },
+              { type: "Faces" as const, id: clusterId },
+            ]
+          : [{ type: "Faces" as const, id: "LIST" }],
+      async onQueryStarted(_args, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          // the person gained a frame in this video: PeopleBlock must refresh
+          dispatch(streamApi.util.invalidateTags(["Stream"]));
+        } catch {
+          // nothing to roll back
+        }
+      },
+    }),
   }),
 });
 
@@ -301,4 +358,6 @@ export const {
   useDeleteEmptyFacesMutation,
   useDetachFaceFromStreamMutation,
   useDeleteFacesBatchMutation,
+  useDetectFrameMutation,
+  useAttachFrameFaceMutation,
 } = facesApi;

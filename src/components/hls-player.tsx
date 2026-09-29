@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import { useAuth } from "@/hooks/useAuth";
+import { useFrameFaceAssist } from "@/hooks/useFrameFaceAssist";
+import { FrameFaceOverlay } from "@/components/faces/frame-face-overlay";
 import { Lock } from "pixelarticons/react";
 import { useRegisterViewMutation } from "@/services/stats";
 import { ReactionBar } from "@/components/player/reaction-bar";
@@ -55,12 +57,15 @@ export const HLSPlayer = ({
   streamId,
   initialRotation = 0,
   onRotationChange,
+  faceAssist = false,
 }: {
   src: string;
   autoplay?: boolean;
   streamId?: string;
   initialRotation?: number;
   onRotationChange?: (rotation: Rotation) => void;
+  /** owner-only interactive face assist: detect faces on the paused frame */
+  faceAssist?: boolean;
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const bgVideoRef = useRef<HTMLVideoElement>(null);
@@ -106,6 +111,16 @@ export const HLSPlayer = ({
     dir: "back" | "fwd";
     nonce: number;
   } | null>(null);
+
+  // Interactive face assist. Boxes are drawn inside the main layer below, which
+  // already carries the source aspect and the view rotation — that is what keeps
+  // them glued to the picture. `videoAspect` must be known first, otherwise the
+  // layer still assumes 16:9 and the boxes would not line up.
+  const faceAssistOn = faceAssist && videoAspect !== null;
+  const faceAssistState = useFrameFaceAssist({
+    enabled: faceAssistOn,
+    streamId,
+  });
 
   useEffect(() => {
     const onFullscreenChange = () => {
@@ -380,12 +395,16 @@ export const HLSPlayer = ({
       }}
       onPlay={() => {
         setIsPlaying(true);
+        faceAssistState.onPlay();
         bgVideoRef.current?.play().catch(() => undefined);
       }}
       onPause={() => {
         setIsPlaying(false);
         if (bgVideoRef.current && !bgVideoRef.current.paused) {
           bgVideoRef.current.pause();
+        }
+        if (faceAssistState.enabled && videoRef.current) {
+          faceAssistState.onPause(videoRef.current);
         }
       }}
       onTimeUpdate={(e) => {
@@ -566,6 +585,17 @@ export const HLSPlayer = ({
             }}
           >
             {mainVideo}
+            {faceAssistState.frame && (
+              <FrameFaceOverlay
+                faces={faceAssistState.frame.faces}
+                frameWidth={faceAssistState.frame.width}
+                frameHeight={faceAssistState.frame.height}
+                busyKey={faceAssistState.busyKey}
+                resolvedKey={faceAssistState.resolvedKey}
+                onAccept={faceAssistState.accept}
+                onReject={faceAssistState.reject}
+              />
+            )}
           </div>
 
           {/* Custom Controls */}

@@ -125,3 +125,39 @@ export interface FaceCropReplaceResponse {
   cluster: FaceCluster;
   crop_object: string;
 }
+
+/* Interactive frame assist: the owner pauses the player, the paused frame is
+ * sent for detection and every face is offered to a cluster. */
+
+export interface FrameFaceSuggestion {
+  id: string;
+  name: string | null;
+  is_named: boolean;
+  sample_count: number;
+  crop_object: string | null;
+  similarity: number;
+  /** at/above the server's auto threshold — attach without asking */
+  auto: boolean;
+}
+
+export interface DetectedFrameFace {
+  /** [x1, y1, x2, y2] in the pixels of the uploaded frame */
+  bbox: [number, number, number, number];
+  confidence: number;
+  /** null = nothing close enough, the UI offers to create a new person */
+  suggestion: FrameFaceSuggestion | null;
+}
+
+export interface DetectFrameResponse {
+  faces: DetectedFrameFace[];
+  /** dimensions of the frame that was analysed (the client may have downscaled) */
+  width: number;
+  height: number;
+}
+
+export interface AttachFrameFaceResponse {
+  cluster: FaceCluster;
+  created: boolean;
+  written: number;
+  t_seconds: number;
+}

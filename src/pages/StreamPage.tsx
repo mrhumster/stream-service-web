@@ -279,6 +279,7 @@ export const StreamPage = () => {
                     autoplay={autoplay}
                     streamId={id}
                     initialRotation={stream.metadata?.rotation ?? 0}
+                    faceAssist={Boolean(isOwner && isReady && !isPublish)}
                   />
                 ) : null}
               </div>
