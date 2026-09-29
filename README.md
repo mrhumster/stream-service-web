@@ -13,14 +13,20 @@ UI is styled as a retro 8-bit pixel art interface with support for three themes:
 | --- | --- |
 | UI | React 19, TypeScript (strict) |
 | Build | Vite 7, Tailwind CSS 4 (CSS-first config), pnpm |
-| State | Redux Toolkit, RTK Query, Zustand |
-| Routing | React Router v7 (browser router) |
+| State | Redux Toolkit + RTK Query, Zustand (coexist) |
+| Routing | React Router v7 (`createBrowserRouter`) |
 | Video | HLS.js (playback), custom HLS player |
-| Components | shadcn/ui (New York) + custom 8-bit pixel art components |
-| Icons | pixelarticons, lucide-react |
+| Components | shadcn/ui (New York) + Radix primitives + custom 8-bit pixel art components |
+| Icons | `pixelarticons` (pixel SVG components), lucide-react; the `@hackernoon/pixel-icon-library` icon font is still imported by `index.css` but no longer used in any component |
+| Maps | Leaflet 1.9 (location dialog, OpenStreetMap tiles) |
 | Fonts | Press Start 2P (self-hosted via @fontsource) |
 | Toasts | Sonner (8-bit styled) |
 | Upload | react-dropzone, multipart/chunked upload |
+| Markdown | react-markdown + remark-gfm (comments) |
+
+> `react`, `react-dom`, `hls.js`, `leaflet`, `sonner`, `react-markdown`, `react-dropzone`,
+> `zustand` are runtime dependencies; Redux Toolkit, `react-redux`, `react-router-dom` and
+> `shadcn` (CLI) are declared in `devDependencies` (they are bundled at build time).
 
 ## Features
 
@@ -56,10 +62,17 @@ UI is styled as a retro 8-bit pixel art interface with support for three themes:
   (Sun → Star → Moon icons);
 - **Real-time updates** via WebSocket (`STREAM_UPDATED`, `STREAM_READY`
   events invalidate RTK Query tags);
-- **Public catalog** with infinite scroll (IntersectionObserver);
-- **My Streams** page with table/grid toggle, default table view,
-  client-side sorting by Title/Status/Created, and a quick Share (copy-link)
-  action for `unlisted` streams in the table;
+- **Public catalog** with infinite scroll (IntersectionObserver, 24 per page) and
+  server-side search: `q` is debounced (400 ms), persisted in `?q=`, and matched by the
+  backend against title, description and tags; a separate `?tag=` chip filter is applied
+  client-side on top of the fetched page;
+- **My Streams** page with table/grid toggle (default table), **server-side** status and
+  "faces detected" filters plus `created_at`/`title`/`status` sorting (50 per page,
+  infinite scroll), and a quick Share (copy-link) action for `unlisted` streams in the
+  table. Filters, sorting and view mode live in the `ownStreamsFilters` Redux slice and are
+  persisted to `localStorage` (`gocast-own-streams-filters`), so they survive navigation;
+- **Batch face detection:** multiselect (checkboxes in grid and table) → `Detect Faces (N of M)`
+  posts one `POST stream/faces/batch` request for all selected streams without detections;
 - **Edit page** with HLS player preview for ready/published streams;
 - **Mobile responsive:** hamburger nav, hidden columns on small screens;
 - **Toast notifications** (Sonner, styled as 8-bit pixel toasts);
@@ -75,12 +88,27 @@ UI is styled as a retro 8-bit pixel art interface with support for three themes:
 - **Activity feed (`/activity`):** who/what/when across streams and your account,
   unread highlight + mark-read, infinite scroll;
 - **Reactions + views:** pixel ReactionBar in the HLS player (like/dislike counters,
-  optimistic updates), one view registered per playback;
+  optimistic updates, guest → sign-in hint); a view is registered once per stream
+  after 80% of it has been watched;
+- **Orientation (rotation):** view-only rotation in the player (`RotateCw` button, `R`
+  shortcut, 0 → 90 → 180 → 270) that persists nothing by itself; the orientation is
+  stored on the Edit page (Orientation selector → PATCH `metadata.rotation`) and passed
+  back into the player as `initialRotation`. The box aspect is derived from the real
+  `videoWidth`/`videoHeight`, so portrait sources are never cropped;
 - **Face detection («Свои люди»):** owner/admin can run face clustering on a ready/published
-  stream (a `faces` processing task appears alongside transcode/thumbnail); `/people` lists
-  detected people clusters (sample/video counts), `/people/:clusterId` shows per-stream
-  occurrences (timestamp + confidence) and supports renaming a person via PATCH
-  (`VITE_FACES_URL` → faces-service).
+  stream (single button or **batch** multiselect) — a `faces` processing task appears
+  alongside transcode/thumbnail; `/people` lists detected clusters with server-side
+  pagination and groups of likely duplicates (cosine similarity of 512-d centroids ≥ 50%),
+  `/people/:clusterId` shows per-stream occurrences (timestamp + confidence);
+- **Face management:** rename a person (with a "merge into existing person" suggestion when
+  the name is already taken), delete a person, merge several people into one, unlink a
+  person from a single video (`Unlink` in the stream's People block), and bulk-delete
+  empty clusters. Deleting/merging never re-triggers detection — `faces_detected` stays
+  `true` because the result is being curated, not invalidated (`VITE_FACES_URL` → faces-service);
+- **Location map:** a pin in Stream Details opens a dialog with a lazy-loaded Leaflet map
+  (OpenStreetMap tiles) + *Open in OSM* / *Open in Google Maps* links;
+- **Error page:** the router's root `errorElement` renders a pixel-styled error page with
+  a "Back to Streams" action instead of a blank React Router screen.
 
 ## Commands
 
@@ -106,26 +134,33 @@ pnpm k8s:deploy     # build → push → rollout restart deployment
 ```
 src/
 ├── main.tsx                    # entry point, Provider + Redux store
-├── App.tsx                     # router, ThemeProvider, Toaster
+├── App.tsx                     # router (MainLayout + errorElement), ThemeProvider, Toaster
 ├── hooks.ts                    # typed Redux hooks
 ├── index.css                   # Tailwind + theme CSS (light/dark/soft)
 ├── assets/
 │   └── react.svg
 ├── components/
-│   ├── hls-player.tsx          # custom HLS player (wide/fullscreen/touch/blur)
+│   ├── hls-player.tsx          # custom HLS player (wide/fullscreen/touch/blur/rotation)
+│   ├── email-verification.tsx  # unverified banner (resend + /verify link)
 │   ├── marquee-title.tsx       # auto-scrolling overflow text
 │   ├── mode-toggle.tsx         # cyclic theme toggle (light → soft → dark)
 │   ├── protected-route.tsx     # auth guard
-│   ├── stream-card.tsx         # card with thumbnail + status + duration
+│   ├── stream-card.tsx         # card with thumbnail + status + duration (+ select overlay)
 │   ├── stream-sidebar.tsx      # infinite-scroll related streams
 │   ├── theme-context.ts        # ThemeProviderContext + useTheme
 │   ├── theme-provider.tsx      # ThemeProvider with localStorage
-│   ├── video-dropzone.tsx      # react-dropzone (single/multi)
+│   ├── video-dropzone.tsx      # react-dropzone (single/multi, max 20 files in multi mode)
 │   ├── comments/
 │   │   ├── comments-section.tsx # stream comments (markdown, replies, pagination)
 │   │   └── markdown-body.tsx    # react-markdown + remark-gfm renderer
+│   ├── faces/
+│   │   ├── face-crop.tsx       # cluster thumbnail (lazy by default, eager opt-out)
+│   │   └── people-block.tsx    # "People in this video" + unlink
 │   ├── player/
 │   │   └── reaction-bar.tsx     # 8-bit like/dislike/views bar
+│   ├── stream/
+│   │   ├── location-map.tsx    # lazy Leaflet + OpenStreetMap map
+│   │   └── share-button.tsx     # copy-link button (8-bit)
 │   └── ui/
 │       ├── button.tsx, button-variants.ts, card.tsx, dialog.tsx
 │       ├── dropdown-menu.tsx, input.tsx, label.tsx
@@ -138,35 +173,42 @@ src/
 │           ├── variants.ts     # CVA variants
 │           └── styles/retro.css
 ├── feature/
-│   └── auth/authSlice.ts
+│   ├── auth/authSlice.ts               # token + profile
+│   ├── ownStreams/ownStreamsFiltersSlice.ts # filters/sort/view mode (localStorage)
+│   └── settings/settingsSlice.ts       # theme preference
 ├── hooks/
 │   ├── useAuth.ts
+│   ├── use-in-view.ts        # reusable IntersectionObserver hook (lazy face crops)
 │   ├── useMultipartUpload.ts
 │   └── useVideoUrl.ts
 ├── layouts/MainLayout.tsx
 ├── lib/
-│   ├── stream-format.ts        # statusConfig, formatDate, thumbnailUrl
-│   └── utils.ts                # cn(), getErrorMessage()
+│   ├── face-similarity.ts     # display helpers only (threshold 0.5, percent format);
+│   │                          # similarity groups are computed by faces-service
+│   ├── parse-location.ts      # "lat,lng" and ISO-6709 parsing
+│   ├── stream-format.ts       # statusConfig, formatDate, thumbnailUrl
+│   └── utils.ts               # cn(), getErrorMessage()
 ├── pages/
 │   ├── ActivityPage.tsx        # activity feed (/activity)
 │   ├── CreateStreamPage.tsx    # Single/Batch upload tabs
-│   ├── EditStreamPage.tsx      # edit + HLS preview
+│   ├── EditStreamPage.tsx      # edit + HLS preview + orientation selector
+│   ├── ErrorPage.tsx           # root errorElement (pixel style)
 │   ├── HelpPage.tsx            # static help guide (/help)
-│   ├── MainPage.tsx            # landing page
-│   ├── OwnStreamsPage.tsx       # table/grid, sorting
+│   ├── MainPage.tsx            # ⚠ dead code — legacy landing page, not routed (`/` → StreamsPage)
+│   ├── OwnStreamsPage.tsx      # table/grid, server filters/sort, batch face detection
 │   ├── PeoplePage.tsx          # face clusters (/people)
-│   ├── PeopleDetailPage.tsx    # cluster detail + rename (/people/:id)
+│   ├── PeopleDetailPage.tsx    # cluster detail + rename/merge (/people/:id)
 │   ├── StreamPage.tsx          # detail + player + owner actions
-│   ├── StreamsPage.tsx         # catalog, infinite scroll
+│   ├── StreamsPage.tsx         # catalog (`/` and /streams), search + infinite scroll
 │   └── VerifyPage.tsx          # email verification token
 ├── services/
 │   ├── auth.ts                 # login, register, logout, verify/resend
 │   ├── comments.ts             # commentApi (list/create/update/delete)
 │   ├── events.ts               # eventApi (activity feed)
-│   ├── faces.ts                # facesApi (People list/detail/rename)
+│   ├── faces.ts                # facesApi (list/detail/rename/merge/delete/unlink)
 │   ├── stats.ts                # statsApi (reactions + views)
-│   ├── streams.ts              # CRUD + upload (single/multipart)
-│   └── users.ts                # whoami, lists (with reauth)
+│   ├── streams.ts              # CRUD + upload (single/multipart) + search/filter params
+│   └── users.ts                # whoami (with reauth)
 ├── store/
 │   ├── store.ts
 │   └── middleware/
@@ -186,9 +228,9 @@ src/
 
 | Path | Page | Access |
 | --- | --- | --- |
-| `/` | MainPage (landing) | public |
-| `/streams` | Stream catalog | public |
-| `/streams/:id` | Stream detail + player | public (access by owner rights) |
+| `/` | Stream catalog | public |
+| `/streams` | Stream catalog (same page as `/`) | public |
+| `/streams/:id` | Stream detail + player | public for published `public`/`unlisted`; owner for the rest |
 | `/streams/create` | Create stream | **authenticated only** |
 | `/streams/own` | My streams | **authenticated only** |
 | `/streams/:id/edit` | Edit stream | **authenticated only** |
@@ -196,17 +238,27 @@ src/
 | `/help` | Help guide | public |
 | `/activity` | Activity feed | **authenticated only** |
 | `/people` | People (face clusters) | **authenticated only** |
-| `/people/:clusterId` | People detail + rename | **authenticated only** |
+| `/people/:clusterId` | People detail + rename/merge | **authenticated only** |
 
-Private routes wrapped in `ProtectedRoute`: no token → redirect to `/`.
+Routes are nested under a single `MainLayout` element in `src/App.tsx`; its
+`errorElement` is `ErrorPage`, so any throw in a route or in the layout renders the
+pixel error page instead of React Router's blank screen.
+
+Private routes are nested under `ProtectedRoute`: no token → redirect to `/`.
+`MainPage.tsx` (legacy landing page) is **not routed** — `/` serves the catalog.
 
 ## Architecture
 
 ### State Management
 
-`store/store.ts` combines reducers:
-- `authApi`, `userApi`, `streamApi` — RTK Query API slices;
-- `auth` — token, profile, initialization flag.
+`store/store.ts` combines 7 RTK Query API reducers plus 3 local slices:
+- API slices — `authApi`, `userApi`, `streamApi`, `eventApi`, `commentApi`,
+  `statsApi`, `facesApi` (each with its own `baseQueryWithReauth`);
+- `auth` — token, profile, initialization flag;
+- `settings` — theme preference (persisted to `localStorage`);
+- `ownStreamsFilters` — My Streams status/faces filters, sort field/order and
+  grid/table view mode (persisted to `localStorage` under
+  `gocast-own-streams-filters`, so they survive navigation and reloads).
 
 Middleware: `socketMiddleware` (WebSocket) and `authListener` (loads profile
 after login).
@@ -219,11 +271,13 @@ original request on success; otherwise dispatches `eraseAuth`.
 
 ### Upload Flow
 
-`useMultipartUpload`: `init` → 5 MB chunks × 3 parallel → `complete`.
-Each chunk retries up to 3 times with exponential backoff.
-Files < 5 MB use direct upload.
+`useMultipartUpload`: `init` → 5 MiB chunks (`MAX_PART_ATTEMPTS = 3` per chunk,
+exponential backoff) → `complete`.
+Files smaller than one chunk (5 MiB) skip the multipart flow and go through the
+plain `upload` endpoint instead.
 
-**Batch upload** (`CreateStreamPage`): sequential stream creation, 2-concurrency
+**Batch upload** (`CreateStreamPage`): up to 20 files per batch
+(`maxFiles` in `video-dropzone.tsx`), sequential stream creation with a 2-concurrency
 parallel file upload, per-file progress queue, retry failed, completion countdown.
 
 ### WebSocket
@@ -234,14 +288,19 @@ the handshake). Events `STREAM_UPDATED` / `STREAM_READY` invalidate RTK Query ta
 
 ### HLS Player
 
-Custom 547-line player on hls.js:
+Custom 684-line player on hls.js:
 - Bearer auth + anti-cache `?t=` on all HLS requests;
 - 403 → "Access denied";
 - Second HLS instance for blurred background;
-- Custom controls: play/pause, seek, volume, mute, wide, fullscreen;
-- Keyboard shortcuts (Space/F/W/Arrows/H/Escape) + help overlay;
+- Custom controls: play/pause, seek, volume, mute, wide, fullscreen, rotate;
+- Keyboard shortcuts (Space/F/W/R/Arrows/H/Escape) + help overlay;
 - Touch controls: tap to toggle, auto-hide after 3s;
-- Flash overlays for volume/seek feedback.
+- Flash overlays for volume/seek feedback;
+- View-only rotation (`initialRotation` / `onRotationChange`): the box aspect comes
+  from the real `videoWidth`/`videoHeight`, the rotation is applied to a wrapper
+  layer (so the `<video>` element is never remounted and the HLS instance stays
+  attached), and the root box is capped with `width: min(100%, <aspect>·70vh)` so
+  portrait sources are letterboxed instead of cropped.
 
 ### Theme System
 
@@ -283,14 +342,31 @@ Path alias `@/*` → `src/*` (tsconfig + vite.config.ts).
 **Docker:** multi-stage — Node 20 + pnpm builder → nginx:alpine.
 SPA fallback, 1-year immutable cache on static assets, gzip, `/health` endpoint.
 
-**K8s:** manifests in `k8s/` (Deployment, Service, Ingress).
+**K8s:** `k8s/` holds the local manifests — `deployment.yaml` and `service.yaml`
+only (no Ingress; traefik is the default ingress class). The Ingress, ConfigMaps and
+domain values are generated by `/home/xomrkob/projects/GoCast/scripts/render-env.sh`
+and applied by the root `Makefile` (`make render`, `make apps`), not from this repo.
 Image `xomrkob/web-frontend:latest`, namespace `go-app`.
 Resources: 50-100m CPU, 64-128Mi memory. Probes on `/health`.
+Note: the deployment uses the `:latest` tag, so redeploys need
+`kubectl -n go-app rollout restart deployment/web-frontend` — `kubectl set image`
+with the same tag is a no-op.
 
 ## Known Issues
 
 - `useVideoUrl` is a stub — returns `isLoading: null`, `error: null`
   (dead branches in StreamPage can never trigger loading/error states).
+- `src/pages/MainPage.tsx` is dead code: the legacy landing page is not routed
+  (`/` renders `StreamsPage`) and nothing imports it.
+- `axios` is declared in `package.json` but not used anywhere in `src/` —
+  the API layer uses RTK Query (`fetchBaseQuery`) exclusively.
+- `zustand` is declared in `package.json` but not imported anywhere: global state is
+  Redux Toolkit only, and per-component state is local `useState` (Zustand coexists
+  in the stack as a leftover from an earlier plan).
+- `@hackernoon/pixel-icon-library` is still imported in `src/index.css`
+  (`@import ".../fonts/iconfont.css"`) but no component uses its `pixel-icon-*` classes —
+  icons come from `pixelarticons/react` and lucide-react, so the font is dead weight in
+  the CSS bundle.
 
 ## Troubleshooting
 
@@ -327,22 +403,45 @@ pnpm dev
 - shadcn/ui (New York) in `src/components/ui/`,
   8-bit variants in `src/components/ui/8bit/`;
 - `cn()` utility for class merging (clsx + tailwind-merge);
-- Types in `src/types/` (auth, stream, user);
+- Types in `src/types/` (`auth`, `user`, `stream`, `event`, `comment`, `stats`, `face`);
 - No comments in code (unless requested), no secrets in commits.
 
 ## Changelog
 
+- **Video orientation:** view-only rotation in the player (`RotateCw` / `R`, 0→90→180→270)
+  + Orientation selector on the Edit page persisted to `metadata.rotation`. Series of
+  geometry fixes: box aspect from the real `videoWidth`/`videoHeight`, rotation moved to an
+  always-rendered wrapper layer (so `<video>` is never remounted and the HLS instance stays
+  attached), `min()`-based box in wide mode, and a `70vh` cap in normal mode — portrait
+  sources are no longer cropped or padded — 2026-09-26;
+- **Catalog search:** server-side `q` (matches title, description and tags), input with
+  400 ms debounce, `?q=` URL persistence, `?tag=` stays a client-side filter over the
+  fetched page — 2026-09-26;
+- **Crash fix + error page:** streams with `processing: null` no longer crash StreamPage
+  (`processing` is now `StreamProcessingTask[] | null`); new `ErrorPage` as the router's
+  root `errorElement` instead of a blank React Router screen — 2026-09-26;
+- **Face management:** rename with "merge into existing person" suggestion, delete,
+  merge several people, unlink a person from a single video, bulk-delete empty clusters;
+  deleting/merging no longer re-triggers detection (`faces_detected` stays `true`) — 2026-09-25;
+- **People `/people`:** server-side pagination (50/page) + server-computed groups and
+  `total`, likely-duplicate groups (centroid cosine ≥ 50%) with **Select N** for merge,
+  face crops lazy-loaded via IntersectionObserver (fixed the faces-reader 503) — 2026-09-25;
+- **My Streams filters:** status/faces filters, sort field/order and grid/table view mode
+  moved to Redux + `localStorage` (`gocast-own-streams-filters`) so they survive
+  navigation; filter-dependent empty state with **Reset filters** — 2026-09-25;
+- **Batch face detection:** multiselect streams (grid + table) → **Detect Faces (N of M)**,
+  one batch request instead of N — 2026-09-25;
 - **People («Свои люди»):** Detect Faces button on stream page (owner/admin) +
   `faces` task chip, `/people` cluster list, `/people/:clusterId` detail with rename,
   `VITE_FACES_URL` — 2026-09-22;
 - **Help guide:** public `/help` page with topic sections + FAQ, Help link in
   header nav (desktop + mobile) — 2026-09-22;
 - **Location map:** pin in Stream Details opens a dialog with an embedded Leaflet map
-  (CARTO dark tiles) + OSM/Google Maps links; lazy-loaded — 2026-09-16;
+  (OpenStreetMap tiles, no API key) + OSM/Google Maps links; lazy-loaded — 2026-09-16;
 - **Video metadata:** Recorded / Location / Camera rows in Stream Details (from
-  transcoder ffprobe) — 2026-09-16;
+  transcoder ffprobe, incl. ISO-6709 parsing) — 2026-09-16;
 - **Reactions + views:** ReactionBar in the HLS player (like/dislike optimistic),
-  `registerView` on first play, `VITE_STATS_URL` — 2026-09-16;
+  `registerView` after 80% of the stream is watched, `VITE_STATS_URL` — 2026-09-16;
 - **Comments gate:** composer hidden on non-`published`/`private` streams
   (`allowComments`) — 2026-09-15;
 - **Comments:** markdown section under Stream Details, replies, edit/delete,
