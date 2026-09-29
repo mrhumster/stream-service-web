@@ -27,6 +27,7 @@ import {
 import { FaceCrop } from "@/components/faces/face-crop";
 import { formatPercent, SIMILARITY_THRESHOLD } from "@/lib/face-similarity";
 import type {
+  FaceCluster,
   FaceClusterWithStats,
   FacesListResponse,
   SimilarityGroup,
@@ -34,6 +35,14 @@ import type {
 
 const PAGE_SIZE = 50;
 const BATCH_DELETE_CHUNK_SIZE = 100;
+const BATCH_MERGE_CHUNK_SIZE = 100;
+
+// The first merge request carries a full chunk; every later one also carries the
+// already-merged target cluster, so it only fits BATCH_MERGE_CHUNK_SIZE - 1 ids.
+const mergeBatchCountFor = (count: number) =>
+  count <= BATCH_MERGE_CHUNK_SIZE
+    ? 1
+    : 1 + Math.ceil((count - BATCH_MERGE_CHUNK_SIZE) / (BATCH_MERGE_CHUNK_SIZE - 1));
 
 const pixelBtnOutline =
   "inline-flex items-center justify-center gap-2 bg-card text-card-foreground hover:bg-accent border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold";
@@ -248,6 +257,10 @@ export const PeoplePage = () => {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleteTarget, setDeleteTarget] = useState<Person | null>(null);
   const [confirmMerge, setConfirmMerge] = useState(false);
+  const [mergeProgress, setMergeProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
   const [confirmDeleteEmpty, setConfirmDeleteEmpty] = useState(false);
   const [confirmDeleteBatch, setConfirmDeleteBatch] = useState(false);
 
@@ -337,6 +350,11 @@ export const PeoplePage = () => {
     [clusters, selected],
   );
 
+  const mergeBatchCount = useMemo(
+    () => mergeBatchCountFor(sortedSelected.length),
+    [sortedSelected.length],
+  );
+
   const deleteBatchSamples = useMemo(
     () => selectedPeople.reduce((sum, c) => sum + c.sample_count, 0),
     [selectedPeople],
@@ -388,12 +406,32 @@ export const PeoplePage = () => {
 
   const runMerge = async () => {
     if (sortedSelected.length < 2) return;
+    const ids = sortedSelected;
+    const total = mergeBatchCountFor(ids.length);
+    let target: string | null = null;
+    let index = 0;
+    let batches = 0;
+    let lastCluster: FaceCluster | null = null;
     try {
-      const res = await mergeFaces({
-        cluster_ids: sortedSelected,
-      }).unwrap();
+      while (index < ids.length) {
+        // After the first batch the target cluster occupies one slot, so the
+        // payload is [target, ...chunk] and must stay <= BATCH_MERGE_CHUNK_SIZE.
+        const size =
+          target === null
+            ? BATCH_MERGE_CHUNK_SIZE
+            : BATCH_MERGE_CHUNK_SIZE - 1;
+        const chunk = ids.slice(index, index + size);
+        index += chunk.length;
+        const res = await mergeFaces({
+          cluster_ids: target === null ? chunk : [target, ...chunk],
+        }).unwrap();
+        target = res.target_id;
+        lastCluster = res.cluster;
+        batches += 1;
+        setMergeProgress({ done: batches, total });
+      }
       toast.success(
-        `Merged into ${res.cluster.is_named ? res.cluster.name : "person"}`,
+        `Merged into ${lastCluster && lastCluster.is_named ? lastCluster.name : "person"}`,
       );
       setSelected(new Set());
       setConfirmMerge(false);
@@ -403,6 +441,8 @@ export const PeoplePage = () => {
       const detail = (err as { data?: { detail?: string } } | undefined)?.data
         ?.detail;
       toast.error(detail ? `Failed: ${detail}` : "Failed to merge people");
+    } finally {
+      setMergeProgress(null);
     }
   };
 
@@ -503,7 +543,11 @@ export const PeoplePage = () => {
               className={pixelBtn}
             >
               <Merge className="size-3.5" />
-              {merging ? "Merging..." : `Merge ${sortedSelected.length}`}
+              {mergeProgress
+                ? `Merging ${mergeProgress.done}/${mergeProgress.total}`
+                : merging
+                  ? "Merging..."
+                  : `Merge ${sortedSelected.length}`}
             </button>
             <button
               type="button"
@@ -647,8 +691,15 @@ export const PeoplePage = () => {
             </DialogTitle>
             <DialogDescription className="text-xs uppercase tracking-wider">
               All face samples will be moved into one cluster. The merged person
-              keeps the name of the first selected named person. This cannot be
-              undone.
+              keeps the name of the first selected named person.
+              {sortedSelected.length > BATCH_MERGE_CHUNK_SIZE && (
+                <>
+                  {" "}
+                  This will run in {mergeBatchCount} batches of up to{" "}
+                  {BATCH_MERGE_CHUNK_SIZE}.
+                </>
+              )}{" "}
+              This cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -665,7 +716,11 @@ export const PeoplePage = () => {
               disabled={merging}
               onClick={() => void runMerge()}
             >
-              {merging ? "Merging..." : "Merge"}
+              {mergeProgress
+                ? `Merging ${mergeProgress.done}/${mergeProgress.total}`
+                : merging
+                  ? "Merging..."
+                  : "Merge"}
             </button>
           </DialogFooter>
         </DialogContent>
