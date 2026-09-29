@@ -169,13 +169,19 @@ export const useFrameFaceAssist = ({
 
         // console.log, not console.debug: DevTools hides Verbose by default, so
         // the timings were invisible in the browser while running fine.
+        //
+        // The server's own span occasionally measures slightly longer than the
+        // client's round trip (~30ms, cause unknown), so anything derived by
+        // subtracting the two can come out negative. We print the two raw
+        // numbers instead and clamp the difference.
         const server = Math.round(res.took_ms);
+        const total = Math.round(answeredAt - startedAt);
         console.log(
           `[face-assist] t=${t.toFixed(2)}s faces=${res.faces.length} ` +
             `capture+encode=${Math.round(encodedAt - startedAt)}ms ` +
-            `upload=${Math.round(answeredAt - encodedAt - server)}ms ` +
             `server=${server}ms ` +
-            `total=${Math.round(answeredAt - startedAt)}ms`,
+            `outside=${Math.max(0, total - server)}ms ` +
+            `total=${total}ms`,
         );
 
         if (res.faces.length === 0) {
