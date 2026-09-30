@@ -1,4 +1,6 @@
 import type { Middleware } from "@reduxjs/toolkit";
+import type { UnknownAction } from "redux";
+import { toast } from "sonner";
 import { streamApi } from "../../services/streams";
 
 interface PartialRootState {
@@ -7,46 +9,101 @@ interface PartialRootState {
   };
 }
 
-export const socketMiddleware: Middleware<{}, PartialRootState> = (store) => {
+const RECONNECT_BASE_DELAY_MS = 1500;
+const RECONNECT_MAX_DELAY_MS = 20000;
+
+export const socketMiddleware: Middleware<object, PartialRootState> = (store) => {
   let socket: WebSocket | null = null;
-  return (next) => (action: any) => {
-    const result = next(action);
-    const state = store.getState();
-    const token = state.auth.token;
-    if (token && !socket) {
-      socket = new WebSocket(
-        `wss://api.example.com/stream/ws/updates?token=${token}`,
-      );
-      socket.onmessage = (event) => {
-        console.log("message from back");
-        try {
-          const data = JSON.parse(event.data);
-          console.log("received message", data);
-          if (data.type === "STREAM_UPDATED") {
-            store.dispatch(
-              streamApi.util.invalidateTags([
-                { type: "Stream", id: data.payload?.stream_id },
-              ]),
-            );
-          }
-          if (data.type === "STREAM_READY") {
-            store.dispatch(
-              streamApi.util.invalidateTags([{ type: "Stream", id: "LIST" }]),
-            );
-          }
-        } catch (e) {
-          console.error("WS parse error", e);
-        }
-      };
+  let reconnectAttempt = 0;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-      socket.onclose = () => {
-        socket = null;
-      };
+  const clearReconnectTimer = () => {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
     }
+  };
 
-    if (action.type === "auth/eraseAuth" && socket) {
-      socket.close();
+  const connect = () => {
+    const token = store.getState().auth.token;
+    if (!token || socket) return;
+
+    socket = new WebSocket(import.meta.env.VITE_WS_URL, [token]);
+
+    socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "STREAM_UPDATED") {
+          store.dispatch(
+            streamApi.util.invalidateTags([
+              { type: "Stream", id: data.payload?.stream_id },
+            ]),
+          );
+        }
+        if (data.type === "STREAM_READY") {
+          store.dispatch(
+            streamApi.util.invalidateTags([{ type: "Stream", id: "LIST" }]),
+          );
+        }
+        // The export worker finished out of band, so the cached status is the
+        // only way the page learns about it. Both outcomes arrive: a silent
+        // failure would strand the button on "Preparing".
+        if (data.type === "STREAM_EXPORT_READY") {
+          store.dispatch(
+            streamApi.util.invalidateTags([
+              { type: "StreamExport", id: data.payload?.stream_id },
+            ]),
+          );
+          toast.success("Your MP4 is ready to download");
+        }
+        if (data.type === "STREAM_EXPORT_FAILED") {
+          store.dispatch(
+            streamApi.util.invalidateTags([
+              { type: "StreamExport", id: data.payload?.stream_id },
+            ]),
+          );
+          toast.error(data.payload?.error || "The export failed.");
+        }
+      } catch (e) {
+        console.error("WS parse error", e);
+      }
+    };
+
+    socket.onopen = () => {
+      reconnectAttempt = 0;
+    };
+
+    socket.onclose = () => {
       socket = null;
+      // Авто-переподключение с экспоненциальной паузой, пока юзер в сессии.
+      if (store.getState().auth.token) {
+        const delay = Math.min(
+          RECONNECT_BASE_DELAY_MS * 2 ** reconnectAttempt,
+          RECONNECT_MAX_DELAY_MS,
+        );
+        reconnectAttempt += 1;
+        clearReconnectTimer();
+        reconnectTimer = setTimeout(() => connect(), delay);
+      } else {
+        reconnectAttempt = 0;
+        clearReconnectTimer();
+      }
+    };
+  };
+
+  return (next) => (action: unknown) => {
+    const result = next(action);
+
+    if ((action as UnknownAction).type === "auth/eraseAuth") {
+      reconnectAttempt = 0;
+      clearReconnectTimer();
+      if (socket) {
+        socket.onclose = null;
+        socket.close();
+        socket = null;
+      }
+    } else {
+      connect();
     }
 
     return result;

@@ -1,5 +1,5 @@
-import { ModeToggle } from "@/components/mode-toggle";
 import { Link, Outlet } from "react-router-dom";
+import { Menu, Sun, Star, Moon, Monitor, ChevronDown, ShieldAlert, Activity as ActivityIcon, Users as UsersIcon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -7,20 +7,44 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/8bit/dropdown-menu";
+import { Button } from "@/components/ui/8bit/button";
 import { LoginForm } from "@/components/ui/login-form";
 import { RegisterForm } from "@/components/ui/register-form";
 import { useAuth } from "@/hooks/useAuth";
 import { useState } from "react";
 import { useGetAuthUserQuery } from "@/services/users";
 import { useLogoutMutation } from "@/services/auth";
+import { useAppDispatch, useAppSelector } from "@/hooks";
+import { eraseAuth } from "@/feature/auth/authSlice";
+import { EmailVerificationBanner } from "@/components/email-verification";
+import { setAutoplay, setTheme } from "@/feature/settings/settingsSlice";
+import { useTheme, type Theme } from "@/components/theme-context";
 
 export const MainLayout = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const { data } = useGetAuthUserQuery();
   const auth = useAuth();
+  const { data } = useGetAuthUserQuery(undefined, {
+    skip: !auth.isAuth && !auth.isInitializing,
+  });
   const [logout] = useLogoutMutation();
+  const dispatch = useAppDispatch();
+  const { autoplay, theme: themeSetting } = useAppSelector((s) => s.settings);
+  const { setTheme: applyTheme } = useTheme();
+
+  const themeOptions: { value: Theme; label: string; icon: React.ReactNode }[] = [
+    { value: "light", label: "Light", icon: <Sun className="size-4" /> },
+    { value: "soft", label: "Soft", icon: <Star className="size-4" /> },
+    { value: "dark", label: "Dark", icon: <Moon className="size-4" /> },
+    { value: "system", label: "System", icon: <Monitor className="size-4" /> },
+  ];
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       <header className="border-b-4 border-primary p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.1)]">
@@ -39,9 +63,17 @@ export const MainLayout = () => {
               <li>
                 <Link
                   to="/streams"
-                  className="uppercase font-bold hover:text-primary transition-colors"
+                  className="uppercase font-bold hover:text-primary hover:underline underline-offset-4 decoration-4 transition-colors"
                 >
                   Streams
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/help"
+                  className="uppercase font-bold hover:text-primary hover:underline underline-offset-4 decoration-4 transition-colors"
+                >
+                  Help
                 </Link>
               </li>
               {auth.isAuth ? (
@@ -49,9 +81,27 @@ export const MainLayout = () => {
                   <li className="flex items-center gap-3">
                     <Link
                       to="/streams/own"
-                      className="uppercase font-bold hover:text-primary transition-colors"
+                      className="uppercase font-bold hover:text-primary hover:underline underline-offset-4 decoration-4 transition-colors"
                     >
                       My Videos
+                    </Link>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <Link
+                      to="/activity"
+                      className="inline-flex items-center gap-1.5 uppercase font-bold hover:text-primary hover:underline underline-offset-4 decoration-4 transition-colors"
+                    >
+                      <ActivityIcon className="size-3.5" />
+                      Activity
+                    </Link>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <Link
+                      to="/people"
+                      className="inline-flex items-center gap-1.5 uppercase font-bold hover:text-primary hover:underline underline-offset-4 decoration-4 transition-colors"
+                    >
+                      <UsersIcon className="size-3.5" />
+                      People
                     </Link>
                   </li>
                   <li className="flex items-center gap-3">
@@ -60,11 +110,11 @@ export const MainLayout = () => {
                       onOpenChange={setIsProfileOpen}
                     >
                       <DialogTrigger asChild>
-                        <button className="uppercase font-bold hover:text-primary transition-colors">
+                        <button className="uppercase font-bold hover:text-primary hover:underline underline-offset-4 decoration-4 transition-colors">
                           {data?.email}
                         </button>
                       </DialogTrigger>
-                      <DialogContent className="sm:max-w-[425px] border-4 border-primary shadow-[8px_8px_0_0_rgba(0,0,0,1)] bg-card p-0 overflow-hidden">
+                      <DialogContent className="sm:max-w-[425px] border-4 border-primary shadow-[8px_8px_0_0_rgba(0,0,0,1)] bg-card p-0 overflow-hidden [&_[data-slot=dialog-close]]:text-primary-foreground [&_[data-slot=dialog-close]]:opacity-100">
                         <DialogHeader className="bg-primary p-4 border-b-4 border-black">
                           <DialogTitle className="text-primary-foreground text-xs uppercase tracking-tighter">
                             Profile
@@ -76,6 +126,15 @@ export const MainLayout = () => {
                               Email
                             </span>
                             <p className="text-sm mt-1">{data?.email}</p>
+                            {data && data.email_verified === false && data.role !== "admin" && (
+                              <Link
+                                to="/verify"
+                                className="inline-flex items-center gap-1 mt-1 text-[10px] uppercase font-bold text-yellow-600 hover:underline"
+                              >
+                                <ShieldAlert className="size-3" />
+                                Unverified — verify email
+                              </Link>
+                            )}
                           </div>
                           <div className="flex gap-6 text-[10px] uppercase text-muted-foreground border-t-2 border-foreground/10 pt-3">
                             <div>
@@ -103,11 +162,71 @@ export const MainLayout = () => {
                                 )}
                             </div>
                           </div>
+
+                          <div className="border-t-2 border-foreground/10 pt-4 flex flex-col gap-3">
+                            <span className="text-[10px] uppercase font-bold text-muted-foreground">
+                              Settings
+                            </span>
+
+                            {/* Autoplay toggle */}
+                            <label className="flex items-center justify-between cursor-pointer">
+                              <span className="text-sm font-bold uppercase">Autoplay</span>
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={autoplay}
+                                onClick={() => dispatch(setAutoplay(!autoplay))}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-none border-2 border-black transition-colors ${
+                                  autoplay ? "bg-green-600" : "bg-muted"
+                                }`}
+                              >
+                                <span
+                                  className={`inline-block h-4 w-4 bg-white shadow transition-transform ${
+                                    autoplay ? "translate-x-5" : "translate-x-1"
+                                  }`}
+                                />
+                              </button>
+                            </label>
+
+                            {/* Theme dropdown */}
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-bold uppercase">Theme</span>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button className="flex items-center gap-2 border-2 border-black px-3 py-1 text-xs uppercase font-bold bg-background hover:bg-accent transition-colors">
+                                    {themeOptions.find((o) => o.value === themeSetting)?.label}
+                                    <ChevronDown className="size-3" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  {themeOptions.map((opt) => (
+                                    <DropdownMenuItem
+                                      key={opt.value}
+                                      onSelect={() => {
+                                        dispatch(setTheme(opt.value));
+                                        applyTheme(opt.value);
+                                      }}
+                                    >
+                                      <span className="flex items-center gap-2">
+                                        {opt.icon}
+                                        {opt.label}
+                                        {themeSetting === opt.value && <span className="ml-auto">✓</span>}
+                                      </span>
+                                    </DropdownMenuItem>
+                                  ))}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </div>
                         </div>
                       </DialogContent>
                     </Dialog>
                     <button
-                      onClick={() => logout()}
+                      onClick={() =>
+                        void logout()
+                          .unwrap()
+                          .finally(() => dispatch(eraseAuth()))
+                      }
                       className="bg-destructive text-destructive-foreground px-4 py-1 text-[10px] uppercase font-bold shadow-[4px_4px_0_0_rgba(0,0,0,0.2)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]"
                     >
                       Logout
@@ -158,10 +277,66 @@ export const MainLayout = () => {
                 </Dialog>
               )}
             </ul>
-            <ModeToggle />
+            <div className="md:hidden">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="pixel-border"
+                    aria-label="Menu"
+                  >
+                    <Menu className="h-[1.2rem] w-[1.2rem]" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link to="/streams">Streams</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/help">Help</Link>
+                  </DropdownMenuItem>
+                  {auth.isAuth && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/streams/own">My Videos</Link>
+                    </DropdownMenuItem>
+                  )}
+                  {auth.isAuth && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/activity">Activity</Link>
+                    </DropdownMenuItem>
+                  )}
+                  {auth.isAuth && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/people">People</Link>
+                    </DropdownMenuItem>
+                  )}
+                  {auth.isAuth ? (
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onSelect={() =>
+                        void logout()
+                          .unwrap()
+                          .finally(() => dispatch(eraseAuth()))
+                      }
+                    >
+                      Logout
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem
+                      onSelect={() => setIsModalOpen(true)}
+                    >
+                      Sign In
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </nav>
         </div>
       </header>
+
+      <EmailVerificationBanner />
 
       {/* Контент страницы */}
       <main className="flex-1 container mx-auto p-6">

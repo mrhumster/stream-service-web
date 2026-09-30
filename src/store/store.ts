@@ -1,9 +1,14 @@
 import { combineReducers, configureStore } from "@reduxjs/toolkit";
 import { authSlice } from "../feature/auth/authSlice";
-import { videoProgressSlice } from "../feature/videoProgress/videoProgressSlice";
+import { settingsReducer } from "../feature/settings/settingsSlice";
+import { ownStreamsFiltersReducer } from "../feature/ownStreams/ownStreamsFiltersSlice";
 import { authApi } from "../services/auth";
 import { userApi } from "../services/users";
 import { streamApi } from "../services/streams";
+import { eventApi } from "../services/events";
+import { commentApi } from "../services/comments";
+import { statsApi } from "../services/stats";
+import { facesApi } from "../services/faces";
 import { socketMiddleware } from "../store/middleware/socketMiddleware";
 import { authListener } from "./middleware/authListener";
 
@@ -11,8 +16,13 @@ const rootReducer = combineReducers({
   [authApi.reducerPath]: authApi.reducer,
   [userApi.reducerPath]: userApi.reducer,
   [streamApi.reducerPath]: streamApi.reducer,
+  [eventApi.reducerPath]: eventApi.reducer,
+  [commentApi.reducerPath]: commentApi.reducer,
+  [statsApi.reducerPath]: statsApi.reducer,
+  [facesApi.reducerPath]: facesApi.reducer,
   auth: authSlice.reducer,
-  videoProgress: videoProgressSlice.reducer,
+  settings: settingsReducer,
+  ownStreamsFilters: ownStreamsFiltersReducer,
 });
 
 export const store = configureStore({
@@ -22,6 +32,10 @@ export const store = configureStore({
       .concat(authApi.middleware)
       .concat(userApi.middleware)
       .concat(streamApi.middleware)
+      .concat(eventApi.middleware)
+      .concat(commentApi.middleware)
+      .concat(statsApi.middleware)
+      .concat(facesApi.middleware)
       .concat(socketMiddleware)
       .concat(authListener.middleware),
 });

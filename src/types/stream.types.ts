@@ -18,13 +18,20 @@ export interface UpdateStreamRequest {
   description?: string;
   visibility?: StreamVisibility;
   tags?: string[];
+  rotation?: Rotation;
 }
+
+export type Rotation = 0 | 90 | 180 | 270;
 
 export interface StreamMetadata {
   duration: number;
   size: number;
   format: string;
   resolution: string;
+  recorded_at?: string;
+  location?: string;
+  camera?: string;
+  rotation?: number;
 }
 
 export interface StreamStorage {
@@ -34,11 +41,12 @@ export interface StreamStorage {
   filename: string;
 }
 
-export interface StreamProcessing {
+export interface StreamProcessingTask {
+  task_type: "transcode" | "thumbnail" | "faces";
   progress: number;
   steps: string[];
   error: string | null;
-  task_id: string;
+  task_id: string | null;
 }
 
 export interface StreamAnalytics {
@@ -59,12 +67,25 @@ export interface StreamResponse {
   created_at: string;
   updated_at: string;
   published_at: string | null;
-  processing: StreamProcessing;
+  processing: StreamProcessingTask[] | null;
+  faces_detected?: boolean;
 }
+
+export type StreamSortBy = "created_at" | "title" | "status";
+export type StreamSortOrder = "asc" | "desc";
+
+export type StreamStatusFilter = StreamStatus | "all";
+export type FacesFilterValue = "all" | "detected" | "not_detected";
+export type StreamViewMode = "grid" | "table";
 
 export interface StreamListParams {
   limit?: number;
   offset?: number;
+  q?: string;
+  status?: StreamStatus;
+  faces_detected?: boolean;
+  sort?: StreamSortBy;
+  order?: StreamSortOrder;
 }
 
 export interface StreamListResponse {
@@ -72,6 +93,20 @@ export interface StreamListResponse {
   total: number;
   limit: number;
   offset: number;
+}
+
+export interface FacesBatchRequest {
+  ids: string[];
+}
+
+export interface FacesBatchFailure {
+  stream_id: string;
+  reason: string;
+}
+
+export interface FacesBatchResponse {
+  processed: string[];
+  failed: FacesBatchFailure[];
 }
 
 export interface StartUploadRequest {
@@ -103,4 +138,27 @@ export interface CompleteUploadRequest {
 export interface MultipartPart {
   part_number: number;
   etag: string;
+}
+
+/* On-demand MP4 export (see services/transcoder-service/cmd/exporter). The
+ * status mirrors the row stream-service owns; the worker never writes it. */
+export type StreamExportStatus = "pending" | "ready" | "failed";
+
+export interface StreamExportResponse {
+  status: StreamExportStatus;
+  size: number;
+  error: string;
+  /** False until someone asks for the export; pending alone cannot say so. */
+  requested: boolean;
+  /**
+   * The name the server will serve the download under, built from the stream
+   * title. It is part of the status rather than of the download response
+   * because the save dialog has to be opened before the file is fetched, and a
+   * browser only grants one to a live click.
+   */
+  file_name?: string;
+}
+
+export interface RequestStreamExportResponse {
+  task_id: string;
 }

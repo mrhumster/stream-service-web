@@ -1,26 +1,39 @@
 import { MainLayout } from "./layouts/MainLayout";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
-import { MainPage } from "./pages/MainPage";
 import { StreamsPage } from "./pages/StreamsPage";
+import { ErrorPage } from "./pages/ErrorPage";
 import { CreateStreamPage } from "./pages/CreateStreamPage";
 import { EditStreamPage } from "./pages/EditStreamPage";
 import { StreamPage } from "./pages/StreamPage";
+import { VerifyPage } from "./pages/VerifyPage";
+import { ActivityPage } from "./pages/ActivityPage";
+import { PeoplePage } from "./pages/PeoplePage";
+import { PeopleDetailPage } from "./pages/PeopleDetailPage";
 import { ProtectedRoute } from "./components/protected-route";
 import { ThemeProvider } from "@/components/theme-provider";
 import { OwnStreamsPage } from "./pages/OwnStreamsPage";
+import { HelpPage } from "./pages/HelpPage";
+import { Toaster } from "sonner";
+import { useAppSelector } from "@/hooks";
 
 const router = createBrowserRouter([
   {
     element: <MainLayout />,
+    errorElement: <ErrorPage />,
     children: [
-      { path: "/", element: <MainPage /> },
+      { path: "/", element: <StreamsPage /> },
       { path: "/streams", element: <StreamsPage /> },
+      { path: "/verify", element: <VerifyPage /> },
+      { path: "/help", element: <HelpPage /> },
       {
         element: <ProtectedRoute />,
         children: [
           { path: "/streams/own", element: <OwnStreamsPage /> },
           { path: "/streams/create", element: <CreateStreamPage /> },
           { path: "/streams/:id/edit", element: <EditStreamPage /> },
+          { path: "/activity", element: <ActivityPage /> },
+          { path: "/people", element: <PeoplePage /> },
+          { path: "/people/:clusterId", element: <PeopleDetailPage /> },
         ],
       },
       { path: "/streams/:id", element: <StreamPage /> },
@@ -29,9 +42,12 @@ const router = createBrowserRouter([
 ]);
 
 function App() {
+  const themeSetting = useAppSelector((s) => s.settings.theme);
+
   return (
-    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+    <ThemeProvider defaultTheme={themeSetting} storageKey="vite-ui-theme">
       <RouterProvider router={router} />
+      <Toaster position="bottom-left" richColors={false} />
     </ThemeProvider>
   );
 }

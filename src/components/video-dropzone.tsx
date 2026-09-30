@@ -3,8 +3,11 @@ import { Upload, X, Film } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface VideoDropzoneProps {
-  file: File | null
-  onFileSelect: (file: File | null) => void
+  file?: File | null
+  onFileSelect?: (file: File | null) => void
+  multiple?: boolean
+  onFilesSelected?: (files: File[]) => void
+  disabled?: boolean
 }
 
 function formatFileSize(bytes: number): string {
@@ -14,18 +17,27 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export function VideoDropzone({ file, onFileSelect }: VideoDropzoneProps) {
+export function VideoDropzone({
+  file,
+  onFileSelect,
+  multiple = false,
+  onFilesSelected,
+  disabled = false,
+}: VideoDropzoneProps) {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: { "video/*": [] },
-    maxFiles: 1,
+    maxFiles: multiple ? 20 : 1,
+    disabled,
     onDrop: (accepted) => {
-      if (accepted.length > 0) {
-        onFileSelect(accepted[0])
+      if (multiple && onFilesSelected) {
+        onFilesSelected(accepted);
+      } else if (!multiple && onFileSelect && accepted.length > 0) {
+        onFileSelect(accepted[0]);
       }
     },
   })
 
-  if (file) {
+  if (!multiple && file) {
     return (
       <div className="border-4 border-foreground/30 rounded-none p-6 flex items-center gap-4">
         <Film className="size-10 text-primary shrink-0" />
@@ -39,7 +51,7 @@ export function VideoDropzone({ file, onFileSelect }: VideoDropzoneProps) {
         </div>
         <button
           type="button"
-          onClick={() => onFileSelect(null)}
+          onClick={() => onFileSelect?.(null)}
           className="shrink-0 p-1 border-2 border-foreground/20 hover:border-destructive hover:text-destructive transition-colors"
         >
           <X className="size-4" />
@@ -56,15 +68,22 @@ export function VideoDropzone({ file, onFileSelect }: VideoDropzoneProps) {
         isDragActive
           ? "border-primary bg-primary/5"
           : "border-foreground/30 hover:border-primary",
+        disabled && "opacity-50 cursor-not-allowed",
       )}
     >
       <input {...getInputProps()} />
       <Upload className="size-10 mx-auto mb-3 text-muted-foreground" />
       <p className="text-sm font-bold uppercase tracking-tight">
-        {isDragActive ? "Drop video here" : "Drag & drop video file"}
+        {isDragActive
+          ? multiple
+            ? "Drop videos here"
+            : "Drop video here"
+          : multiple
+            ? "Drag & drop video files"
+            : "Drag & drop video file"}
       </p>
       <p className="text-[10px] uppercase text-muted-foreground mt-1">
-        or click to browse
+        {multiple ? "or click to browse (up to 20 files)" : "or click to browse"}
       </p>
     </div>
   )

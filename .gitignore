@@ -11,9 +11,15 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
 
 # Editor directories and files
 .vscode/*
+
+# Obsidian vault (project memory, local only)
+.obsidian/
+_notes/
+.opencode/
 !.vscode/extensions.json
 .idea
 .DS_Store

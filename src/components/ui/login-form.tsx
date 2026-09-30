@@ -19,7 +19,7 @@ const inputClassName =
 
 export function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps) {
   const dispatch = useAppDispatch();
-  const [getToken] = useGetTokenMutation();
+  const [getToken, { isLoading }] = useGetTokenMutation();
   const [error, setError] = useState<string | null>(null);
   const [fieldError, setFieldError] = useState(false);
 
@@ -40,6 +40,8 @@ export function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps) {
       if (fetchErr.status === 401) {
         setError("Invalid email or password");
         setFieldError(true);
+      } else if (fetchErr.status === "TIMEOUT_ERROR") {
+        setError("Login timed out. Check backend connectivity.");
       } else {
         setError("Login failed");
       }
@@ -78,9 +80,10 @@ export function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps) {
       )}
       <Button
         type="submit"
+        disabled={isLoading}
         className="w-full bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-12"
       >
-        Login
+        {isLoading ? "Signing in..." : "Login"}
       </Button>
       <div className="text-center text-[8px] uppercase opacity-50">
         New user?{" "}

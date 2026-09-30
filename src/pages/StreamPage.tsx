@@ -1,29 +1,72 @@
+import { useState, useEffect, lazy, Suspense } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "sonner";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { MapPin } from "lucide-react";
 import {
   useGetStreamQuery,
   useDeleteStreamMutation,
   usePublishStreamMutation,
   useUnpublishStreamMutation,
+  useReprocessStreamMutation,
+  useProcessFacesStreamMutation,
 } from "@/services/streams";
 import { useVideoUrl } from "@/hooks/useVideoUrl";
 import {
   statusConfig,
   defaultStatus,
   formatDate,
-} from "@/components/stream-card";
+} from "@/lib/stream-format";
 import { useAppSelector } from "@/hooks";
-import { cn } from "@/lib/utils";
-import { ArrowLeft, Lock, PenSquare, Delete, Globe } from "pixelarticons/react";
+import { cn, getErrorMessage } from "@/lib/utils";
+import { ArrowLeft, Lock, PenSquare, Delete, Globe, Reload, User } from "pixelarticons/react";
 import { HLSPlayer } from "@/components/hls-player";
 import ProgressBar from "@/components/ui/8bit/progress-bar";
+import { parseLocation } from "@/lib/parse-location";
+
+const LocationMap = lazy(() =>
+  import("@/components/stream/location-map").then((m) => ({
+    default: m.LocationMap,
+  })),
+);
 import { useAuth } from "@/hooks/useAuth";
+import { MarqueeTitle } from "@/components/marquee-title";
+import { StreamSidebar } from "@/components/stream-sidebar";
+import type { StreamProcessingTask } from "@/types/stream.types";
+import { CommentsSection } from "@/components/comments/comments-section";
+import { ShareButton } from "@/components/stream/share-button";
+import { ExportDownloadButton } from "@/components/stream/export-download-button";
+import { PeopleBlock } from "@/components/faces/people-block";
+
+const pixelBtn =
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold";
+
+const pixelBtnOutline =
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap bg-card text-card-foreground hover:bg-accent border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold";
+
+const pixelBtnDestructive =
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap bg-destructive text-destructive-foreground hover:bg-destructive/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold";
+
+const taskLabels: Record<StreamProcessingTask["task_type"], string> = {
+  transcode: "Transcoding",
+  thumbnail: "Thumbnail",
+  faces: "Faces",
+};
 
 export const StreamPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const authUser = useAppSelector((state) => state.auth.authUser);
+  const autoplay = useAppSelector((s) => s.settings.autoplay);
   const { token, isInitializing } = useAuth();
   const { data: stream, isLoading, error } = useGetStreamQuery(id!);
   const {
@@ -36,6 +79,18 @@ export const StreamPage = () => {
     usePublishStreamMutation();
   const [unpublishStream, { isLoading: isUnpublished }] =
     useUnpublishStreamMutation();
+  const [reprocessStream, { isLoading: isReprocessing }] =
+    useReprocessStreamMutation();
+  const [processFaces, { isLoading: isProcessingFaces }] =
+    useProcessFacesStreamMutation();
+  const [confirmAction, setConfirmAction] = useState<
+    "publish" | "unpublish" | "delete" | null
+  >(null);
+  const [mapOpen, setMapOpen] = useState(false);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [id]);
 
   const isAccessDenied =
     error && "status" in error && (error as FetchBaseQueryError).status === 403;
@@ -43,6 +98,7 @@ export const StreamPage = () => {
   const isReady = stream && stream.status == "ready";
   const isPublish = stream && stream.status == "published";
   const isOwner = authUser && stream && authUser.id === stream.owner_id;
+  const isAdmin = authUser?.role === "admin";
   const isProfileLoading = token && !authUser;
 
   if (isLoading || isInitializing || isProfileLoading) {
@@ -92,8 +148,32 @@ export const StreamPage = () => {
 
   const status = statusConfig[stream.status] ?? defaultStatus;
 
+  const coords = parseLocation(stream.metadata?.location);
+
+  const processingError =
+    stream.processing?.find((t) => t.error)?.error ?? null;
+  const tasks = stream.processing ?? [];
+
+  const handleReprocess = async () => {
+    try {
+      await reprocessStream({ id: stream!.id }).unwrap();
+      toast.success("Processing restarted");
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
+  };
+
+  const handleProcessFaces = async () => {
+    try {
+      await processFaces({ id: stream!.id }).unwrap();
+      toast.success("Face detection started");
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
+  };
+
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="max-w-6xl mx-auto">
       <Link
         to="/streams"
         className="inline-flex items-center gap-2 text-xs uppercase text-muted-foreground hover:text-foreground mb-6"
@@ -103,159 +183,429 @@ export const StreamPage = () => {
       </Link>
 
       <h2 className="text-2xl font-bold uppercase tracking-tighter mb-6">
-        {stream.title}
+        <MarqueeTitle text={stream.title} />
       </h2>
 
-      {/* Video Player */}
-      {!isReady && !isPublish ? (
-        <div className="max-w-3xl mx-auto flex flex-col items-center gap-4 py-20">
-          <Lock className="size-10 text-muted-foreground" />
-          <p className="text-sm text-center uppercase tracking-wider text-muted-foreground">
-            The video is not ready for playback yet. Please wait.
-          </p>
-          <Link
-            to="/streams"
-            className="inline-flex items-center gap-2 text-xs uppercase text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="size-4" />
-            Back to Streams
-          </Link>
-          <ProgressBar progress={stream.processing.progress} />
-          <p className="uppercase text-zinc-500">{stream.processing.steps}</p>
-        </div>
-      ) : (
-        <Card className="rounded-none border-4 border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,0.3)] mb-6 overflow-hidden">
-          <div className="bg-black flex items-center justify-center max-h-[70vh] w-full">
-            {videoLoading ? (
-              <span className="text-sm uppercase tracking-wider text-white/50 animate-pulse">
-                Loading video...
-              </span>
-            ) : videoError ? (
-              <span className="text-sm uppercase tracking-wider text-red-400">
-                {videoError}
-              </span>
-            ) : videoUrl ? (
-              <HLSPlayer src={videoUrl} />
-            ) : null}
-          </div>
-        </Card>
-      )}
-
-      {isOwner && (
-        <div className="flex gap-2 mb-6">
-          <Link
-            to={`/streams/${stream.id}/edit`}
-            className="inline-flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold"
-          >
-            <PenSquare className="size-5" />
-            Update Stream
-          </Link>
-          {isReady && (
-            <button
-              disabled={isPublish || isPublished}
-              onClick={async () => {
-                await publishStream({ id: stream.id }).unwrap();
-              }}
-              className="cursor-pointer inline-flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 fotn-bold"
-            >
-              <Globe className="size-5" />
-              Publish
-            </button>
-          )}
-          {isPublish && (
-            <button
-              disabled={isUnpublished}
-              onClick={async () => {
-                await unpublishStream({ id: stream.id }).unwrap();
-              }}
-              className="cursor-pointer inline-flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 fotn-bold"
-            >
-              <Globe className="size-5" />
-              Unpublish
-            </button>
-          )}
-          <button
-            disabled={isDeleting}
-            onClick={async () => {
-              await deleteStream(stream.id).unwrap();
-              navigate("/streams");
-            }}
-            className="cursor-pointer inline-flex items-center gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold disabled:opacity-50"
-          >
-            <Delete className="size-5" />
-            {isDeleting ? "Deleting..." : "Delete Stream"}
-          </button>
-        </div>
-      )}
-
-      {/* Metadata */}
-      <Card className="rounded-none border-4 border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,0.3)]">
-        <CardHeader className="border-b-2 border-foreground/10 bg-muted/30">
-          <div className="flex items-center justify-between gap-2">
-            <CardTitle className="text-sm uppercase tracking-tight">
-              Stream Details
-            </CardTitle>
-            <span
-              className={cn(
-                "shrink-0 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
-                status.className,
-              )}
-            >
-              {status.label}
-            </span>
-          </div>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          {stream.description && (
-            <div>
-              <span className="text-[10px] uppercase font-bold text-muted-foreground">
-                Description
-              </span>
-              <p className="text-sm mt-1">{stream.description}</p>
-            </div>
-          )}
-
-          <div className="flex items-center gap-2 text-[10px] uppercase text-muted-foreground">
-            <span className="font-bold">Visibility:</span>
-            <span>{stream.visibility}</span>
-          </div>
-
-          {stream.tags && stream.tags.length > 0 && (
-            <div>
-              <span className="text-[10px] uppercase font-bold text-muted-foreground">
-                Tags
-              </span>
-              <div className="flex flex-wrap gap-1 mt-1">
-                {stream.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-bold uppercase"
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Left column: player + actions + metadata */}
+        <div className="flex-1 min-w-0">
+          {/* Video Player */}
+          {!isReady && !isPublish ? (
+            <div className="flex flex-col items-center gap-4 py-20">
+              {stream.status === "error" ? (
+                <>
+                  <p className="text-sm uppercase tracking-wider text-destructive">
+                    Processing failed
+                  </p>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground max-w-md text-center">
+                    {processingError || "Unknown error during processing"}
+                  </p>
+                  {(isOwner || isAdmin) && (
+                    <button
+                      onClick={handleReprocess}
+                      disabled={isReprocessing}
+                      aria-label={isReprocessing ? "Reprocessing..." : "Reprocess"}
+                      className="cursor-pointer inline-flex items-center justify-center min-w-9 gap-2 whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-3 sm:px-4 font-bold disabled:opacity-50"
+                    >
+                      <Reload className="size-5" />
+                      <span className="hidden md:inline">
+                        {isReprocessing ? "Reprocessing..." : "Reprocess"}
+                      </span>
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Lock className="size-10 text-muted-foreground" />
+                  <p className="text-sm text-center uppercase tracking-wider text-muted-foreground">
+                    The video is not ready for playback yet. Please wait.
+                  </p>
+                  <Link
+                    to="/streams"
+                    className="inline-flex items-center gap-2 text-xs uppercase text-muted-foreground hover:text-foreground"
                   >
-                    {tag}
+                    <ArrowLeft className="size-4" />
+                    Back to Streams
+                  </Link>
+                  {tasks.length === 0 ? (
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground animate-pulse">
+                      Preparing tasks...
+                    </p>
+                  ) : (
+                    <div className="w-full max-w-md flex flex-col gap-4">
+                      {tasks.map((task) => (
+                        <div
+                          key={task.task_type}
+                          className="flex flex-col gap-1"
+                        >
+                          <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-muted-foreground">
+                            <span className="font-bold">
+                              {taskLabels[task.task_type]}
+                            </span>
+                            <span>{task.progress}%</span>
+                          </div>
+                          <ProgressBar progress={task.progress} />
+                          {task.error ? (
+                            <p className="text-xs uppercase text-destructive">
+                              {task.error}
+                            </p>
+                          ) : (
+                            task.steps.length > 0 && (
+                              <p className="text-[10px] uppercase tracking-wider text-zinc-500">
+                                {task.steps.join(" → ")}
+                              </p>
+                            )
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          ) : (
+            <Card className="rounded-none border-4 border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,0.3)] mb-6 overflow-hidden">
+              <div className="bg-black flex items-center justify-center max-h-[70vh] w-full">
+                {videoLoading ? (
+                  <span className="text-sm uppercase tracking-wider text-white/50 animate-pulse">
+                    Loading video...
                   </span>
-                ))}
+                ) : videoError ? (
+                  <span className="text-sm uppercase tracking-wider text-red-400">
+                    {videoError}
+                  </span>
+                ) : videoUrl ? (
+                  <HLSPlayer
+                    src={videoUrl}
+                    autoplay={autoplay}
+                    streamId={id}
+                    initialRotation={stream.metadata?.rotation ?? 0}
+                    faceAssist={Boolean(isOwner && isReady && !isPublish)}
+                  />
+                ) : null}
               </div>
+            </Card>
+          )}
+
+          {(isOwner || stream.visibility === "unlisted") && (
+            <div className="flex items-center gap-2 mb-6">
+              {stream.visibility === "unlisted" && <ShareButton />}
+              {isOwner && (
+              <>
+              {!isPublish && (
+              <Link
+                to={`/streams/${stream.id}/edit`}
+                aria-label="Update Stream"
+                className="inline-flex items-center justify-center min-w-9 gap-2 whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-3 sm:px-4 font-bold"
+              >
+                <PenSquare className="size-5" />
+                <span className="hidden md:inline">Update Stream</span>
+              </Link>
+              )}
+              {/* Only a transcoded stream has an HLS rendition to remux, and
+                  only the owner may export it. */}
+              {(isReady || isPublish) && (
+                <ExportDownloadButton streamId={stream.id} />
+              )}
+              {isReady || isPublish ? (
+                !stream.faces_detected ? (
+                <button
+                  disabled={isProcessingFaces}
+                  onClick={handleProcessFaces}
+                  aria-label={
+                    isProcessingFaces ? "Detecting faces..." : "Detect Faces"
+                  }
+                  className="cursor-pointer inline-flex items-center justify-center min-w-9 gap-2 whitespace-nowrap bg-card text-card-foreground hover:bg-accent border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-3 sm:px-4 font-bold disabled:opacity-50"
+                >
+                  <User className="size-5" />
+                  <span className="hidden md:inline">
+                    {isProcessingFaces ? "Detecting faces..." : "Detect Faces"}
+                  </span>
+                </button>
+                ) : null
+              ) : null}
+              </>
+              )}
+              {isReady && (
+                <button
+                  disabled={isPublish || isPublished}
+                  onClick={() => setConfirmAction("publish")}
+                  aria-label="Publish"
+                  className="cursor-pointer inline-flex items-center justify-center min-w-9 gap-2 whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-3 sm:px-4 font-bold"
+                >
+                  <Globe className="size-5" />
+                  <span className="hidden md:inline">Publish</span>
+                </button>
+              )}
+              {isPublish && (
+                <button
+                  disabled={isUnpublished}
+                  onClick={() => setConfirmAction("unpublish")}
+                  aria-label="Unpublish"
+                  className="cursor-pointer inline-flex items-center justify-center min-w-9 gap-2 whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-3 sm:px-4 font-bold"
+                >
+                  <Globe className="size-5" />
+                  <span className="hidden md:inline">Unpublish</span>
+                </button>
+              )}
+              <button
+                disabled={isDeleting}
+                onClick={() => setConfirmAction("delete")}
+                aria-label={isDeleting ? "Deleting..." : "Delete Stream"}
+                className="cursor-pointer inline-flex items-center justify-center min-w-9 gap-2 whitespace-nowrap bg-destructive text-destructive-foreground hover:bg-destructive/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-3 sm:px-4 font-bold disabled:opacity-50"
+              >
+                <Delete className="size-5" />
+                <span className="hidden md:inline">
+                  {isDeleting ? "Deleting..." : "Delete Stream"}
+                </span>
+              </button>
+
+              <Dialog
+                open={confirmAction !== null}
+                onOpenChange={(open) => !open && setConfirmAction(null)}
+              >
+                <DialogContent className="border-4 border-primary shadow-[8px_8px_0_0_rgba(0,0,0,1)] rounded-none max-w-sm">
+                  <DialogHeader>
+                    <DialogTitle className="text-sm uppercase tracking-wider">
+                      {confirmAction === "publish"
+                        ? "Publish stream?"
+                        : confirmAction === "unpublish"
+                          ? "Unpublish stream?"
+                          : "Delete stream?"}
+                    </DialogTitle>
+                    <DialogDescription className="text-xs uppercase tracking-wider">
+                      {confirmAction === "publish"
+                        ? "This will make the stream publicly available."
+                        : confirmAction === "unpublish"
+                          ? "This will make the stream private again."
+                          : "This action cannot be undone."}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <button
+                      type="button"
+                      className={pixelBtnOutline}
+                      onClick={() => setConfirmAction(null)}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className={
+                        confirmAction === "delete"
+                          ? pixelBtnDestructive
+                          : pixelBtn
+                      }
+                      disabled={
+                        (confirmAction === "publish" && isPublished) ||
+                        (confirmAction === "unpublish" && isUnpublished) ||
+                        (confirmAction === "delete" && isDeleting)
+                      }
+                      onClick={async () => {
+                        const action = confirmAction;
+                        try {
+                          if (action === "publish") {
+                            await publishStream({ id: stream.id }).unwrap();
+                          } else if (action === "unpublish") {
+                            await unpublishStream({ id: stream.id }).unwrap();
+                          } else if (action === "delete") {
+                            await deleteStream(stream.id).unwrap();
+                            navigate("/streams");
+                          }
+                          setConfirmAction(null);
+                        } catch (err) {
+                          toast.error(getErrorMessage(err));
+                        }
+                      }}
+                    >
+                      {confirmAction === "publish"
+                        ? isPublished
+                          ? "Publishing..."
+                          : "Publish"
+                        : confirmAction === "unpublish"
+                          ? isUnpublished
+                            ? "Unpublishing..."
+                            : "Unpublish"
+                          : isDeleting
+                            ? "Deleting..."
+                            : "Delete"}
+                    </button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
           )}
 
-          <div className="flex gap-6 text-[10px] uppercase text-muted-foreground border-t-2 border-foreground/10 pt-3">
-            <div>
-              <span className="font-bold">Created:</span>{" "}
-              {formatDate(stream.created_at)}
-            </div>
-            <div>
-              <span className="font-bold">Updated:</span>{" "}
-              {formatDate(stream.updated_at)}
-            </div>
-            {stream.published_at && (
-              <div>
-                <span className="font-bold">Published:</span>{" "}
-                {formatDate(stream.published_at)}
+          {/* Metadata */}
+          <Card className="rounded-none border-4 border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,0.3)]">
+            <CardHeader className="border-b-2 border-foreground/10 bg-muted/30">
+              <CardTitle className="text-sm uppercase tracking-tight">
+                Stream Details
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              {stream.description && (
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground">
+                    Description
+                  </span>
+                  <p className="text-sm mt-1">{stream.description}</p>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 text-[10px] uppercase text-muted-foreground">
+                <span className="font-bold">Visibility:</span>
+                <span>{stream.visibility}</span>
+                {stream.visibility === "unlisted" && (
+                  <span className="text-[9px] text-primary/80">
+                    (anyone with the link can watch)
+                  </span>
+                )}
               </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+
+              {stream.metadata?.recorded_at && (
+                <div className="flex items-center gap-2 text-[10px] uppercase text-muted-foreground">
+                  <span className="font-bold">Recorded:</span>
+                  <span>{formatDate(stream.metadata.recorded_at)}</span>
+                </div>
+              )}
+
+              {stream.metadata?.location &&
+                (coords ? (
+                  <button
+                    type="button"
+                    onClick={() => setMapOpen(true)}
+                    aria-label="Open location map"
+                    className="inline-flex cursor-pointer items-center gap-2 text-left text-[10px] uppercase text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <MapPin className="size-3.5 shrink-0 text-primary" />
+                    <span className="font-bold">Location:</span>
+                    <span>
+                      {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
+                    </span>
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2 text-[10px] uppercase text-muted-foreground">
+                    <span className="font-bold">Location:</span>
+                    <span>{stream.metadata.location}</span>
+                  </div>
+                ))}
+
+              {stream.metadata?.camera && (
+                <div className="flex items-center gap-2 text-[10px] uppercase text-muted-foreground">
+                  <span className="font-bold">Camera:</span>
+                  <span>{stream.metadata.camera}</span>
+                </div>
+              )}
+
+              {stream.tags && stream.tags.length > 0 && (
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground">
+                    Tags
+                  </span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {stream.tags.map((tag) => (
+                      <Link
+                        key={tag}
+                        to={`/streams?tag=${encodeURIComponent(tag)}`}
+                        className="bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-bold uppercase hover:bg-primary/20 transition-colors"
+                      >
+                        {tag}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+            </CardContent>
+            <CardFooter className="flex items-center justify-between gap-2 border-t-2 border-foreground/10 px-4 py-2">
+              <div className="flex flex-wrap gap-6 text-[10px] uppercase text-muted-foreground">
+                <div>
+                  <span className="font-bold">Created:</span>{" "}
+                  {formatDate(stream.created_at)}
+                </div>
+                <div>
+                  <span className="font-bold">Updated:</span>{" "}
+                  {formatDate(stream.updated_at)}
+                </div>
+                {stream.published_at && (
+                  <div>
+                    <span className="font-bold">Published:</span>{" "}
+                    {formatDate(stream.published_at)}
+                  </div>
+                )}
+              </div>
+              <span
+                className={cn(
+                  "shrink-0 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+                  status.className,
+                )}
+              >
+                {status.label}
+              </span>
+            </CardFooter>
+          </Card>
+
+          {isOwner && stream.faces_detected && <PeopleBlock streamId={id!} />}
+
+          {coords && (
+            <Dialog open={mapOpen} onOpenChange={setMapOpen}>
+              <DialogContent className="border-4 border-primary shadow-[8px_8px_0_0_rgba(0,0,0,1)] rounded-none sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="text-sm uppercase tracking-wider">
+                    Location
+                  </DialogTitle>
+                  <DialogDescription className="text-[10px] uppercase tracking-wider">
+                    {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="h-72 w-full sm:h-80">
+                  <Suspense
+                    fallback={
+                      <div className="flex h-full w-full items-center justify-center border-4 border-foreground bg-accent/20 text-[10px] uppercase tracking-wider text-muted-foreground animate-pulse">
+                        Loading map...
+                      </div>
+                    }
+                  >
+                    <LocationMap lat={coords.lat} lng={coords.lng} />
+                  </Suspense>
+                </div>
+                <DialogFooter className="flex flex-wrap items-center gap-2 sm:justify-end">
+                  <a
+                    className={pixelBtn}
+                    href={`https://www.openstreetmap.org/?mlat=${coords.lat}&mlon=${coords.lng}#map=16/${coords.lat}/${coords.lng}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open in OSM
+                  </a>
+                  <a
+                    className={pixelBtn}
+                    href={`https://maps.google.com/?q=${coords.lat},${coords.lng}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open in Google Maps
+                  </a>
+                  <p className="w-full text-right text-[8px] uppercase tracking-wider text-muted-foreground">
+                    © OpenStreetMap contributors
+                  </p>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+
+          <CommentsSection
+            streamId={id!}
+            allowComments={stream.status === "published" && stream.visibility !== "private"}
+          />
+        </div>
+
+        {/* Right column: sidebar */}
+        <aside className="hidden lg:block w-80 shrink-0 lg:sticky lg:top-6 lg:self-start">
+          <StreamSidebar excludeId={id!} />
+        </aside>
+      </div>
     </div>
   );
 };

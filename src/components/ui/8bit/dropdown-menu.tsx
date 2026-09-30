@@ -1,7 +1,9 @@
 import type * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
-import { type VariantProps, cva } from "class-variance-authority";
+import { type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
+
+import { dropDownVariants } from "@/components/ui/8bit/variants";
 
 import {
   DropdownMenu as ShadcnDropdownMenu,
@@ -77,18 +79,6 @@ function DropdownMenuItem({
     </ShadcnDropdownMenuItem>
   );
 }
-
-export const dropDownVariants = cva("", {
-  variants: {
-    font: {
-      normal: "",
-      retro: "retro",
-    },
-  },
-  defaultVariants: {
-    font: "retro",
-  },
-});
 
 function DropdownMenuSubContent({
   children,

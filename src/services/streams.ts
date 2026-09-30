@@ -19,11 +19,16 @@ import type {
   UploadPartRequest,
   UploadPartResponse,
   CompleteUploadRequest,
+  FacesBatchResponse,
+  FacesBatchRequest,
+  StreamExportResponse,
+  RequestStreamExportResponse,
 } from "../types/stream.types";
 
 const baseQuery = fetchBaseQuery({
-  baseUrl: "https://api.example.com/",
+  baseUrl: import.meta.env.VITE_API_URL as string,
   credentials: "include",
+  timeout: 30000,
   prepareHeaders: (headers, { getState }) => {
     const token = (getState() as RootState).auth.token;
     if (token) headers.set("authorization", `Bearer ${token}`);
@@ -56,7 +61,7 @@ const baseQueryWithReauth: BaseQueryFn<
 export const streamApi = createApi({
   reducerPath: "streamApi",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Stream"],
+  tagTypes: ["Stream", "StreamExport"],
   endpoints: (builder) => ({
     publishStream: builder.mutation<void, { id: string }>({
       query: ({ id }) => ({
@@ -78,10 +83,34 @@ export const streamApi = createApi({
         { type: "Stream" as const, id: "LIST" },
       ],
     }),
-    listOwnStreams: builder.query<StreamListResponse, void>({
-      query: () => {
-        return `stream/own`;
+    listOwnStreams: builder.query<StreamListResponse, StreamListParams>({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        searchParams.set("limit", String(params.limit ?? 10));
+        searchParams.set("offset", String(params.offset ?? 0));
+        if (params.status) searchParams.set("status", params.status);
+        if (params.faces_detected !== undefined)
+          searchParams.set("faces_detected", String(params.faces_detected));
+        if (params.sort && params.sort !== "created_at")
+          searchParams.set("sort", params.sort);
+        if (params.order && params.order !== "desc")
+          searchParams.set("order", params.order);
+        return `stream/own?${searchParams.toString()}`;
       },
+      serializeQueryArgs: ({ endpointName, queryArgs }) => {
+        const { limit, status, faces_detected, sort, order } =
+          queryArgs ?? {};
+        return `${endpointName}:${JSON.stringify({ limit, status, faces_detected, sort, order })}`;
+      },
+      merge: (currentCache, newItems) => {
+        if (newItems.offset === 0) return newItems;
+        return {
+          ...newItems,
+          items: [...currentCache.items, ...newItems.items],
+        };
+      },
+      forceRefetch: ({ currentArg, previousArg }) =>
+        currentArg?.offset !== previousArg?.offset,
       providesTags: (result) =>
         result
           ? [
@@ -94,6 +123,39 @@ export const streamApi = createApi({
           : [{ type: "Stream" as const, id: "LIST" }],
     }),
     listStreamsPublic: builder.query<StreamListResponse, StreamListParams>({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        searchParams.set("limit", String(params.limit ?? 10));
+        searchParams.set("offset", String(params.offset ?? 0));
+        if (params.q) searchParams.set("q", params.q);
+        return `stream?${searchParams.toString()}`;
+      },
+      serializeQueryArgs: ({ endpointName, queryArgs }) => {
+        const { limit, q } = queryArgs ?? {};
+        return `${endpointName}:${JSON.stringify({ limit, q })}`;
+      },
+      merge: (currentCache, newItems) => {
+        if (newItems.offset === 0) return newItems;
+        return {
+          ...newItems,
+          items: [...currentCache.items, ...newItems.items],
+        };
+      },
+      forceRefetch: ({ currentArg, previousArg }) =>
+        currentArg?.offset !== previousArg?.offset,
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.items.map(({ id }: { id: string }) => ({
+                type: "Stream" as const,
+                id,
+              })),
+
+              { type: "Stream" as const, id: "LIST" },
+            ]
+          : [{ type: "Stream" as const, id: "LIST" }],
+    }),
+    listStreamsSidebar: builder.query<StreamListResponse, StreamListParams>({
       query: (params) => {
         const searchParams = new URLSearchParams();
         searchParams.set("limit", String(params.limit ?? 10));
@@ -117,7 +179,6 @@ export const streamApi = createApi({
                 type: "Stream" as const,
                 id,
               })),
-
               { type: "Stream" as const, id: "LIST" },
             ]
           : [{ type: "Stream" as const, id: "LIST" }],
@@ -206,11 +267,70 @@ export const streamApi = createApi({
         body,
       }),
     }),
+    reprocessStream: builder.mutation<void, { id: string }>({
+      query: ({ id }) => ({
+        url: `stream/${id}/reprocess`,
+        method: "POST",
+      }),
+      invalidatesTags: (_res, _err, { id }) => [
+        { type: "Stream" as const, id },
+        { type: "Stream" as const, id: "LIST" },
+      ],
+    }),
+    processFacesStream: builder.mutation<void, { id: string }>({
+      query: ({ id }) => ({
+        url: `stream/${id}/faces`,
+        method: "POST",
+      }),
+      invalidatesTags: (_res, _err, { id }) => [
+        { type: "Stream" as const, id },
+        { type: "Stream" as const, id: "LIST" },
+      ],
+    }),
+    detectFacesBatch: builder.mutation<
+      FacesBatchResponse,
+      FacesBatchRequest
+    >({
+      query: (body) => ({
+        url: "stream/faces/batch",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (res) => [
+        { type: "Stream" as const, id: "LIST" },
+        ...(res?.processed ?? []).map((id) => ({
+          type: "Stream" as const,
+          id,
+        })),
+      ],
+    }),
+    requestStreamExport: builder.mutation<
+      RequestStreamExportResponse,
+      string
+    >({
+      query: (streamId) => ({
+        url: `stream/${streamId}/export`,
+        method: "POST",
+      }),
+      // The status only changes once the worker calls back, and that arrives
+      // over the WebSocket; refetching here would just read the pending row we
+      // already optimistically showed.
+      invalidatesTags: (_r, _e, streamId) => [
+        { type: "StreamExport" as const, id: streamId },
+      ],
+    }),
+    getStreamExport: builder.query<StreamExportResponse, string>({
+      query: (streamId) => `stream/${streamId}/export`,
+      providesTags: (_result, _error, streamId) => [
+        { type: "StreamExport" as const, id: streamId },
+      ],
+    }),
   }),
 });
 
 export const {
   useListStreamsPublicQuery,
+  useListStreamsSidebarQuery,
   useGetStreamQuery,
   useCreateStreamMutation,
   useUpdateStreamMutation,
@@ -222,4 +342,9 @@ export const {
   useListOwnStreamsQuery,
   usePublishStreamMutation,
   useUnpublishStreamMutation,
+  useReprocessStreamMutation,
+  useProcessFacesStreamMutation,
+  useDetectFacesBatchMutation,
+  useRequestStreamExportMutation,
+  useGetStreamExportQuery,
 } = streamApi;

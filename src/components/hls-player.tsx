@@ -1,80 +1,490 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import { useAuth } from "@/hooks/useAuth";
+import { useFrameFaceAssist } from "@/hooks/useFrameFaceAssist";
+import { FrameFaceOverlay } from "@/components/faces/frame-face-overlay";
 import { Lock } from "pixelarticons/react";
+import { useRegisterViewMutation } from "@/services/stats";
+import { ReactionBar } from "@/components/player/reaction-bar";
+import type { Rotation } from "@/types/stream.types";
+import {
+  Play,
+  Pause,
+  Maximize2,
+  Minimize2,
+  Volume1,
+  Volume2,
+  VolumeX,
+  Fullscreen,
+  Minimize,
+  Keyboard,
+  RotateCw,
+  RotateCcw,
+} from "lucide-react";
 
-export const HLSPlayer = ({ src }: { src: string }) => {
+// A view is counted only after the viewer has actually watched at least 80%
+// of the stream (threshold check in onTimeUpdate). This keeps the counter
+// honest for real watchers while still catching most drive-by page loads.
+const VIEW_THRESHOLD = 0.8;
+
+function formatTime(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+  const total = Math.floor(seconds);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const ss = String(s).padStart(2, "0");
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
+}
+
+function VolumeIcon({
+  volume,
+  muted,
+  size = "size-4",
+}: {
+  volume: number;
+  muted: boolean;
+  size?: string;
+}) {
+  if (muted || volume === 0) return <VolumeX className={size} />;
+  if (volume < 0.5) return <Volume1 className={size} />;
+  return <Volume2 className={size} />;
+}
+
+export const HLSPlayer = ({
+  src,
+  autoplay = true,
+  streamId,
+  initialRotation = 0,
+  onRotationChange,
+  faceAssist = false,
+}: {
+  src: string;
+  autoplay?: boolean;
+  streamId?: string;
+  initialRotation?: number;
+  onRotationChange?: (rotation: Rotation) => void;
+  /** owner-only interactive face assist: detect faces on the paused frame */
+  faceAssist?: boolean;
+}) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const bgVideoRef = useRef<HTMLVideoElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const registeredFor = useRef<string | null>(null);
+  const [registerView] = useRegisterViewMutation();
   const { isAuth, token, isInitializing } = useAuth();
-  const [isForbidden, setIsForbidden] = useState<Boolean>(false);
+  const [rotation, setRotation] = useState<Rotation>(() =>
+    (initialRotation as Rotation) ?? 0,
+  );
+  // Follow external rotation changes (e.g. the Edit form selector) while the
+  // player is mounted for live preview.
+  const [prevRotation, setPrevRotation] = useState<number | undefined>(
+    initialRotation,
+  );
+  if (prevRotation !== initialRotation) {
+    setPrevRotation(initialRotation);
+    setRotation((initialRotation as Rotation) ?? 0);
+  }
+  const [isForbidden, setIsForbidden] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [videoAspect, setVideoAspect] = useState<number | null>(null);
+  const [volume, setVolume] = useState(1);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isWide, setIsWide] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+  const [showControls, setShowControls] = useState(false);
+  const isTouch =
+    typeof window !== "undefined" &&
+    window.matchMedia("(pointer: coarse)").matches;
+  const [showHelp, setShowHelp] = useState(false);
+  const [hlsSupported] = useState<boolean>(() => Hls.isSupported());
+  const [volFlash, setVolFlash] = useState<{
+    dir: "up" | "down";
+    nonce: number;
+  } | null>(null);
+  const [seekFlash, setSeekFlash] = useState<{
+    dir: "back" | "fwd";
+    nonce: number;
+  } | null>(null);
+
+  // Interactive face assist. Boxes are drawn inside the main layer below, which
+  // already carries the source aspect and the view rotation — that is what keeps
+  // them glued to the picture. `videoAspect` must be known first, otherwise the
+  // layer still assumes 16:9 and the boxes would not line up.
+  const faceAssistOn = faceAssist && videoAspect !== null;
+  const faceAssistState = useFrameFaceAssist({
+    enabled: faceAssistOn,
+    streamId,
+  });
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === wrapperRef.current);
+    };
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () =>
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+
+  useEffect(() => {
+    if (!isTouch) return;
+    const mql = window.matchMedia("(orientation: landscape)");
+    const onChange = (e: MediaQueryListEvent) => {
+      const el = wrapperRef.current;
+      if (!el) return;
+      if (e.matches) {
+        if (document.fullscreenElement === el) return;
+        el.requestFullscreen?.()
+          .catch(() => {
+            setIsWide(true);
+          });
+      } else {
+        setIsWide(false);
+        if (document.fullscreenElement === el) {
+          document
+            .exitFullscreen()
+            .catch(() => undefined);
+        }
+      }
+    };
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, [isTouch]);
+
+  useEffect(() => {
+    if (!isWide && !isFullscreen) return;
+    const prevOverflow = document.body.style.overflow;
+    const prevOverscroll = document.body.style.overscrollBehavior;
+    document.body.style.overflow = "hidden";
+    document.body.style.overscrollBehavior = "none";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.body.style.overscrollBehavior = prevOverscroll;
+    };
+  }, [isWide, isFullscreen]);
+
+  const togglePlay = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.paused) video.play().catch(() => undefined);
+    else video.pause();
+  };
+
+  const toggleFullscreen = async () => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    try {
+      if (!document.fullscreenElement) await el.requestFullscreen();
+      else await document.exitFullscreen();
+    } catch (e) {
+      console.error("Fullscreen failed:", e);
+    }
+  };
+
+  const toggleWide = useCallback(() => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => undefined);
+    }
+    setIsWide((v) => !v);
+  }, []);
+
+  const rotateView = useCallback(() => {
+    setRotation((prev) => {
+      const next = ((prev + 90) % 360) as Rotation;
+      onRotationChange?.(next);
+      return next;
+    });
+  }, [onRotationChange]);
+
+  const seekBy = (delta: number) => {
+    const video = videoRef.current;
+    if (!video) return;
+    const next = Math.min(
+      Math.max(video.currentTime + delta, 0),
+      Number.isFinite(video.duration) ? video.duration : video.currentTime,
+    );
+    video.currentTime = next;
+    setCurrentTime(next);
+    setSeekFlash((f) => ({
+      dir: delta > 0 ? "fwd" : "back",
+      nonce: (f?.nonce ?? 0) + 1,
+    }));
+  };
+
+  const changeVolume = (delta: number) => {
+    const video = videoRef.current;
+    if (!video) return;
+    const next = Math.min(Math.max(video.volume + delta, 0), 1);
+    video.volume = next;
+    if (next > 0) video.muted = false;
+    setVolFlash((f) => ({
+      dir: delta > 0 ? "up" : "down",
+      nonce: (f?.nonce ?? 0) + 1,
+    }));
+  };
+
+  useEffect(() => {
+    if (!isTouch || !showControls) return;
+    const t = setTimeout(() => setShowControls(false), 3000);
+    return () => clearTimeout(t);
+  }, [isTouch, showControls]);
+
+  useEffect(() => {
+    const isActive = () =>
+      isHovered || isFocused || document.fullscreenElement === wrapperRef.current;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!isActive()) return;
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) {
+        return;
+      }
+
+      switch (e.key) {
+        case " ":
+          e.preventDefault();
+          togglePlay();
+          break;
+        case "f":
+        case "F":
+          toggleFullscreen();
+          break;
+        case "w":
+        case "W":
+          toggleWide();
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          changeVolume(0.1);
+          break;
+        case "ArrowDown":
+          e.preventDefault();
+          changeVolume(-0.1);
+          break;
+        case "ArrowLeft":
+          e.preventDefault();
+          seekBy(-20);
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          seekBy(20);
+          break;
+        case "h":
+        case "H":
+          setShowHelp((v) => !v);
+          break;
+        case "r":
+        case "R":
+          rotateView();
+          break;
+        case "Escape":
+          if (showHelp) setShowHelp(false);
+          else if (isWide) setIsWide(false);
+          break;
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [isHovered, isFocused, isWide, showHelp, toggleWide, rotateView]);
+
   useEffect(() => {
     if (isInitializing) return;
 
-    setIsForbidden(false);
-    setErrorMessage(null);
     const video = videoRef.current;
+    const bgVideo = bgVideoRef.current;
     if (!video) return;
 
-    let hls: Hls | null = null;
+    registeredFor.current = null;
+
     const antiCacheUrl = src.includes("?")
       ? `${src}&t=${Date.now()}`
       : `${src}?t=${Date.now()}`;
 
-    if (video.canPlayType("application/vnd.apple.mpegcurl")) {
-      video.src = src;
-    } else if (Hls.isSupported()) {
-      hls = new Hls({
-        enableWorker: false,
-        manifestLoadingMaxRetry: 1,
-        xhrSetup: (xhr, url) => {
-          console.log("HLS requesting:", url);
-          if (url.includes(window.location.host) || !url.startsWith("http")) {
-            const baseUrl = src.substring(0, src.lastIndexOf("/") + 1);
-            const fileName = url.split("/").pop();
-            const correctedUrl = new URL(fileName!, baseUrl).href;
-            xhr.open("GET", correctedUrl, true);
-            console.log("Corrected URL:", correctedUrl); // Проверь в консоли!
-          }
-          if (isAuth) {
-            xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-          }
-        },
-      });
-      hls.on(Hls.Events.MANIFEST_LOADED, (_event, data) => {
-        console.log("Manifest loaded, levels found:", data.levels.length);
-      });
-      hls.on(Hls.Events.ERROR, (_event, data) => {
-        console.error("HLS Error Detail:", data);
-        if (data.response && data.response.code === 403) {
-          setIsForbidden(true);
+    const makeXhrSetup = () => (xhr: XMLHttpRequest, url: string) => {
+      if (url.includes(window.location.host) || !url.startsWith("http")) {
+        const baseUrl = src.substring(0, src.lastIndexOf("/") + 1);
+        const fileName = url.split("/").pop();
+        const correctedUrl = new URL(fileName!, baseUrl).href;
+        xhr.open("GET", correctedUrl, true);
+      }
+      if (isAuth) {
+        xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+      }
+    };
+
+    // Всегда через hls.js: нативные (mpegurl/mpegcurl) пути не могут слать
+    // Authorization, а приватные стримы без Bearer недоступны.
+    if (!hlsSupported) return;
+    const hls = new Hls({
+      enableWorker: false,
+      manifestLoadingMaxRetry: 1,
+      xhrSetup: makeXhrSetup(),
+    });
+    hls.on(Hls.Events.MANIFEST_LOADED, () => {
+      setIsForbidden(false);
+      setErrorMessage(null);
+    });
+    hls.on(Hls.Events.ERROR, (_event, data) => {
+      console.error("HLS Error Detail:", data);
+      if (data.response && data.response.code === 403) {
+        setIsForbidden(true);
+        try {
           const responseText = JSON.parse(data.networkDetails.responseText);
           setErrorMessage(responseText.error);
+        } catch {
+          setErrorMessage("Access denied — you don't have permission to watch this stream.");
         }
+      }
+    });
+    hls.loadSource(antiCacheUrl);
+    hls.attachMedia(video);
+
+    let bgHls: Hls | null = null;
+    if (bgVideo) {
+      bgHls = new Hls({
+        enableWorker: false,
+        manifestLoadingMaxRetry: 1,
+        xhrSetup: makeXhrSetup(),
       });
-      hls.loadSource(antiCacheUrl);
-      hls.attachMedia(video);
-      return () => {
-        if (hls) {
-          hls.destroy();
-        }
-        video.src = "";
-      };
+      bgHls.loadSource(antiCacheUrl);
+      bgHls.attachMedia(bgVideo);
     }
-  }, [src, isAuth, token, isInitializing]);
+
+    return () => {
+      if (hls) hls.destroy();
+      if (bgHls) bgHls.destroy();
+      video.src = "";
+      if (bgVideo) bgVideo.src = "";
+    };
+  }, [src, isAuth, token, isInitializing, hlsSupported]);
+
+  const sourceAspect = videoAspect ?? 16 / 9;
+  const portrait = rotation % 180 !== 0;
+  const rootAspect = 16 / 9;
+  const immersive = isWide || isFullscreen;
 
   if (isInitializing) {
     return (
-      <div className="w-full aspect-video bg-zinc-950 animate-pulse rounded-xl" />
+      <div
+        className="w-full bg-zinc-950 animate-pulse rounded-none"
+        style={{
+          aspectRatio: `${rootAspect}`,
+          width: `min(100%, ${rootAspect * 70}vh)`,
+        }}
+      />
     );
   }
+
+  const mainVideo = (
+    <video
+      ref={videoRef}
+      className="w-full h-full object-contain cursor-pointer"
+      autoPlay={autoplay}
+      playsInline
+      onClick={() => {
+        if (isTouch) {
+          setShowControls((v) => !v);
+          return;
+        }
+        togglePlay();
+      }}
+      onPlay={() => {
+        setIsPlaying(true);
+        faceAssistState.onPlay();
+        bgVideoRef.current?.play().catch(() => undefined);
+      }}
+      onPause={() => {
+        setIsPlaying(false);
+        if (bgVideoRef.current && !bgVideoRef.current.paused) {
+          bgVideoRef.current.pause();
+        }
+        if (faceAssistState.enabled && videoRef.current) {
+          faceAssistState.onPause(videoRef.current);
+        }
+      }}
+      onSeeked={(e) => {
+        // Seeking while paused fires no `pause`, so the face boxes would keep
+        // pointing at the previous frame. Re-detect for the new picture.
+        if (faceAssistState.enabled) {
+          faceAssistState.onSeeked(e.currentTarget);
+        }
+      }}
+      onTimeUpdate={(e) => {
+        const video = e.currentTarget;
+        setCurrentTime(video.currentTime);
+        if (bgVideoRef.current) {
+          bgVideoRef.current.currentTime = video.currentTime;
+        }
+        if (faceAssistState.enabled) {
+          faceAssistState.onTimeCheck(video);
+        }
+        // A view is counted only after the viewer has actually watched at
+        // least 80% of the stream (VIEW_THRESHOLD). This keeps the counter
+        // honest for real watchers while still catching most drive-bys.
+        if (
+          streamId &&
+          registeredFor.current !== streamId &&
+          Number.isFinite(video.duration) &&
+          video.duration > 0 &&
+          video.currentTime / video.duration >= VIEW_THRESHOLD
+        ) {
+          registeredFor.current = streamId;
+          registerView(streamId).catch(() => {
+            // view registration is best-effort; ignore failures
+          });
+        }
+      }}
+      onLoadedMetadata={(e) => {
+        const video = e.currentTarget;
+        setDuration(video.duration);
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
+        if (vw > 0 && vh > 0) {
+          setVideoAspect(vw / vh);
+        }
+      }}
+      onVolumeChange={(e) => {
+        setVolume(e.currentTarget.volume);
+        setIsMuted(e.currentTarget.muted);
+      }}
+    />
+  );
 
   return (
     <div
       key={`${src}-${isAuth}`}
-      className="relative w-full aspect-video bg-zinc-950 overflow-hidden rounded-xl"
+      ref={wrapperRef}
+      tabIndex={0}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onFocus={() => setIsFocused(true)}
+      onBlur={() => setIsFocused(false)}
+      className={`group outline-none w-full overflow-hidden ${
+        immersive
+          ? "fixed inset-0 z-50 h-[100dvh] w-screen overflow-hidden overscroll-none touch-none bg-zinc-950 flex items-center justify-center"
+          : "relative bg-zinc-950 rounded-none"
+      }`}
+      style={
+        immersive
+          ? undefined
+          : {
+              aspectRatio: `${rootAspect}`,
+              width: `min(100%, ${rootAspect * 70}vh)`,
+            }
+      }
     >
-      {isForbidden ? (
+      {!hlsSupported ? (
+        <div className="flex flex-col items-center justify-center w-full h-full p-6 text-center">
+          <h3 className="text-lg font-semibold text-zinc-100 uppercase tracking-wider">
+            HLS playback is not supported on this browser
+          </h3>
+        </div>
+      ) : isForbidden ? (
         <div className="flex flex-col items-center justify-center w-full h-full p-6 text-center animate-in fade-in duration-500">
           <div className="flex items-center justify-center w-16 h-16 mb-4 rounded-full bg-destructive/10 text-destructive">
             <Lock className="size-5" />
@@ -84,13 +494,239 @@ export const HLSPlayer = ({ src }: { src: string }) => {
           </h3>
         </div>
       ) : (
-        <video
-          ref={videoRef}
-          controls
-          className="w-full h-full max-h-[inherit] object-contain"
-          autoPlay
-          playsInline
-        />
+        <>
+          {volFlash && (
+            <div
+              key={volFlash.nonce}
+              className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none"
+            >
+              <div className="animate-flash">
+                <VolumeIcon volume={volume} muted={isMuted} size="size-8" />
+              </div>
+            </div>
+          )}
+          {seekFlash && (
+            <div
+              key={seekFlash.nonce}
+              className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none"
+            >
+              <div className="animate-flash">
+                {seekFlash.dir === "fwd" ? (
+                  <RotateCw className="size-8" />
+                ) : (
+                  <RotateCcw className="size-8" />
+                )}
+              </div>
+            </div>
+          )}
+          {showHelp && (
+            <div
+              className="absolute inset-0 z-20 flex items-center justify-center bg-black/60"
+              onClick={() => setShowHelp(false)}
+            >
+              <div
+                className="bg-card text-card-foreground border-4 border-primary shadow-[8px_8px_0_0_rgba(0,0,0,1)] p-5 max-w-xs w-full mx-4"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h4 className="text-xs font-bold uppercase tracking-wider text-primary mb-4">
+                  Keyboard Shortcuts
+                </h4>
+                <ul className="flex flex-col gap-2 text-[10px] uppercase tracking-wider">
+                  <li className="flex items-center justify-between gap-3">
+                    <span>Play / Pause</span>
+                    <kbd className="bg-muted px-1.5 py-0.5 border border-foreground/20">SPACE</kbd>
+                  </li>
+                  <li className="flex items-center justify-between gap-3">
+                    <span>Fullscreen</span>
+                    <kbd className="bg-muted px-1.5 py-0.5 border border-foreground/20">F</kbd>
+                  </li>
+                  <li className="flex items-center justify-between gap-3">
+                    <span>Wide screen</span>
+                    <kbd className="bg-muted px-1.5 py-0.5 border border-foreground/20">W</kbd>
+                  </li>
+                  <li className="flex items-center justify-between gap-3">
+                    <span>Volume</span>
+                    <kbd className="bg-muted px-1.5 py-0.5 border border-foreground/20">↑ / ↓</kbd>
+                  </li>
+                  <li className="flex items-center justify-between gap-3">
+                    <span>Seek ±20s</span>
+                    <kbd className="bg-muted px-1.5 py-0.5 border border-foreground/20">← / →</kbd>
+                  </li>
+                  <li className="flex items-center justify-between gap-3">
+                    <span>Show / hide help</span>
+                    <kbd className="bg-muted px-1.5 py-0.5 border border-foreground/20">H</kbd>
+                  </li>
+                  <li className="flex items-center justify-between gap-3">
+                    <span>Rotate view</span>
+                    <kbd className="bg-muted px-1.5 py-0.5 border border-foreground/20">R</kbd>
+                  </li>
+                  <li className="flex items-center justify-between gap-3">
+                    <span>Close help / exit wide</span>
+                    <kbd className="bg-muted px-1.5 py-0.5 border border-foreground/20">ESC</kbd>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          )}
+          <video
+            ref={bgVideoRef}
+            className="absolute inset-0 w-full h-full object-cover blur-2xl pointer-events-none"
+            style={{
+              transform: immersive
+                ? `rotate(${rotation}deg) scale(1.1)`
+                : "scale(1.1)",
+            }}
+            muted
+            playsInline
+            autoPlay={autoplay}
+          />
+          <div
+            className="absolute top-1/2 left-1/2 z-10"
+            style={{
+              transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
+              width: immersive
+                ? portrait
+                  ? `min(${sourceAspect * 100}vw, 100dvh)`
+                  : `min(100vw, ${sourceAspect * 100}dvh)`
+                : portrait
+                  ? `min(${sourceAspect * 100}%, ${100 / rootAspect}%)`
+                  : `min(100%, ${(sourceAspect * 100) / rootAspect}%)`,
+              aspectRatio: `${sourceAspect}`,
+            }}
+          >
+            {mainVideo}
+            {faceAssistState.isScanning && (
+              <span className="pointer-events-none absolute left-2 top-2 z-20 border-2 border-black bg-card px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-card-foreground shadow-[2px_2px_0_0_rgba(0,0,0,0.8)]">
+                Scanning faces...
+              </span>
+            )}
+            {faceAssistState.frame && (
+              <FrameFaceOverlay
+                faces={faceAssistState.frame.faces}
+                frameWidth={faceAssistState.frame.width}
+                frameHeight={faceAssistState.frame.height}
+                busyKey={faceAssistState.busyKey}
+                resolvedKey={faceAssistState.resolvedKey}
+                onAccept={faceAssistState.accept}
+                onReject={faceAssistState.reject}
+              />
+            )}
+          </div>
+
+          {/* Custom Controls */}
+          <div className={`absolute bottom-0 inset-x-0 z-10 px-2 pb-1.5 pt-4 sm:px-3 sm:pb-2 sm:pt-8 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-200 ${
+            showControls
+              ? "opacity-100"
+              : "opacity-0 group-hover:opacity-100"
+          }`}>
+            {streamId && (
+              <div className="absolute top-1.5 left-2 sm:top-2 sm:left-3 hidden sm:block">
+                <ReactionBar streamId={streamId} />
+              </div>
+            )}
+            <input
+              type="range"
+              min={0}
+              max={duration || 0}
+              step={0.1}
+              value={currentTime}
+              onChange={(e) => {
+                const video = videoRef.current;
+                if (video) video.currentTime = Number(e.target.value);
+                setCurrentTime(Number(e.target.value));
+              }}
+              className="w-full h-1 cursor-pointer accent-white"
+            />
+            <div className="flex items-center gap-1.5 mt-1 sm:gap-2 sm:mt-1.5 min-w-0">
+              <button
+                onClick={togglePlay}
+                title={isPlaying ? "Pause" : "Play"}
+                className="cursor-pointer text-white hover:text-zinc-300 transition-colors shrink-0"
+              >
+                {isPlaying ? (
+                  <Pause className="size-5" />
+                ) : (
+                  <Play className="size-5" />
+                )}
+              </button>
+
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-white/90 shrink-0 tabular-nums">
+                {formatTime(currentTime)} / {formatTime(duration)}
+              </span>
+
+              <div className="flex-1" />
+
+              <button
+                onClick={() => {
+                  const video = videoRef.current;
+                  if (!video) return;
+                  video.muted = !video.muted;
+                }}
+                title={isMuted ? "Unmute" : "Mute"}
+                className="cursor-pointer text-white hover:text-zinc-300 transition-colors shrink-0"
+              >
+                <VolumeIcon volume={volume} muted={isMuted} />
+              </button>
+
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={isMuted ? 0 : volume}
+                onChange={(e) => {
+                  const video = videoRef.current;
+                  const v = Number(e.target.value);
+                  if (video) {
+                    video.volume = v;
+                    video.muted = v === 0;
+                  }
+                }}
+                className="hidden md:block w-20 md:w-20 h-1 cursor-pointer accent-white shrink-0"
+              />
+
+              <button
+                onClick={toggleWide}
+                title={isWide ? "Shrink video" : "Stretch video to screen width"}
+                className="cursor-pointer text-white hover:text-zinc-300 transition-colors shrink-0"
+              >
+                {isWide ? (
+                  <Minimize2 className="size-5" />
+                ) : (
+                  <Maximize2 className="size-5" />
+                )}
+              </button>
+
+              <button
+                onClick={() => setShowHelp((v) => !v)}
+                title="Keyboard shortcuts (H)"
+                className="hidden md:inline-flex cursor-pointer text-white hover:text-zinc-300 transition-colors shrink-0"
+              >
+                <Keyboard className="size-5" />
+              </button>
+
+              <button
+                onClick={rotateView}
+                title="Rotate view (R)"
+                className="cursor-pointer text-white hover:text-zinc-300 transition-colors shrink-0"
+              >
+                <RotateCw className="size-5" />
+              </button>
+
+              <button
+                onClick={toggleFullscreen}
+                title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                className="cursor-pointer text-white hover:text-zinc-300 transition-colors shrink-0"
+              >
+                {isFullscreen ? (
+                  <Minimize className="size-5" />
+                ) : (
+                  <Fullscreen className="size-5" />
+                )}
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
