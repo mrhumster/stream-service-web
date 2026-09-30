@@ -566,7 +566,11 @@ export const OwnStreamsPage = () => {
                   {/* Link (share for unlisted) */}
                   <TableCell className="hidden md:table-cell">
                     {stream.visibility === "unlisted" && (
-                      <ShareButton iconOnly className="scale-90" />
+                      <ShareButton
+                        iconOnly
+                        className="scale-90"
+                        url={`${window.location.origin}/streams/${stream.id}`}
+                      />
                     )}
                   </TableCell>
                 </TableRow>

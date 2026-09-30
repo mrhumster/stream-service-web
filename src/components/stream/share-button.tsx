@@ -8,14 +8,16 @@ const base =
 export function ShareButton({
   iconOnly = false,
   className,
+  url,
 }: {
   iconOnly?: boolean;
   className?: string;
+  url?: string;
 }) {
   const handleCopy = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      await navigator.clipboard.writeText(url ?? window.location.href);
       toast.success("Link copied to clipboard");
     } catch {
       toast.error("Failed to copy link");
