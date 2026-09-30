@@ -10,7 +10,12 @@ import type { LoginResponse } from "../types/auth.types";
  * a gigabyte) and there would be no progress to show.
  */
 
-const DEFAULT_FILE_NAME = "video.mp4";
+/**
+ * Used when the server suggests nothing: a name is still better than a file the
+ * browser invents, and this one matches what the server falls back to for a
+ * title that sanitizes down to nothing.
+ */
+export const DEFAULT_FILE_NAME = "stream.mp4";
 
 /**
  * The DOM lib types `FileSystemFileHandle` but not the picker, and its
@@ -74,6 +79,22 @@ function authHeaders(): Headers {
 }
 
 /**
+ * Builds an API URL by hand, the way the two calls below have to: the response
+ * is a file, so it cannot go through RTK Query.
+ *
+ * The separator is added here rather than in the URL literals because
+ * `VITE_API_URL` is configured without a trailing slash. RTK Query's `baseUrl`
+ * joins its endpoints itself and hides the difference, but a plain template
+ * literal does not, and a missing slash turns the host into a path segment:
+ * `https://api.example.com` + `stream/<id>/download` is not a request the
+ * server can route at all.
+ */
+function apiUrl(path: string): string {
+  const base = (import.meta.env.VITE_API_URL as string).replace(/\/+$/, "");
+  return `${base}/${path.replace(/^\/+/, "")}`;
+}
+
+/**
  * Fetches the export, refreshing the access token once on a 401. The refresh
  * uses a cookie and may rotate the token, so the retry reads it from the store
  * again rather than reusing the header we just sent.
@@ -82,7 +103,7 @@ async function fetchExport(
   streamId: string,
   signal?: AbortSignal,
 ): Promise<Response> {
-  const url = `${import.meta.env.VITE_API_URL as string}stream/${streamId}/download`;
+  const url = apiUrl(`stream/${streamId}/download`);
   let response = await fetch(url, {
     headers: authHeaders(),
     credentials: "include",
@@ -90,10 +111,10 @@ async function fetchExport(
   });
 
   if (response.status === 401) {
-    const refreshed = await fetch(
-      `${import.meta.env.VITE_API_URL as string}auth/refresh`,
-      { method: "POST", credentials: "include" },
-    );
+    const refreshed = await fetch(apiUrl("auth/refresh"), {
+      method: "POST",
+      credentials: "include",
+    });
     if (refreshed.ok) {
       store.dispatch(tokenReceived((await refreshed.json()) as LoginResponse));
       response = await fetch(url, {

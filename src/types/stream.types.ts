@@ -150,6 +150,13 @@ export interface StreamExportResponse {
   error: string;
   /** False until someone asks for the export; pending alone cannot say so. */
   requested: boolean;
+  /**
+   * The name the server will serve the download under, built from the stream
+   * title. It is part of the status rather than of the download response
+   * because the save dialog has to be opened before the file is fetched, and a
+   * browser only grants one to a live click.
+   */
+  file_name?: string;
 }
 
 export interface RequestStreamExportResponse {

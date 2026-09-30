@@ -6,7 +6,10 @@ import {
   useGetStreamExportQuery,
   useRequestStreamExportMutation,
 } from "@/services/streams";
-import { downloadStreamExport } from "@/services/streamExportDownload";
+import {
+  DEFAULT_FILE_NAME,
+  downloadStreamExport,
+} from "@/services/streamExportDownload";
 import { cn } from "@/lib/utils";
 
 const base =
@@ -31,6 +34,11 @@ type Phase =
  * first would leave us with no way to write the file. We therefore ask for the
  * handle up front and only create the file once the response is known to be
  * good, which means a failed request leaves nothing on disk.
+ *
+ * That same ordering decides the file name: the dialog is already open by the
+ * time the download response arrives, so the name has to come from the status
+ * we fetched earlier, not from the download's Content-Disposition. The server
+ * therefore sends it as part of the export state.
  */
 export function ExportDownloadButton({
   streamId,
@@ -101,7 +109,7 @@ export function ExportDownloadButton({
       if (showSaveFilePicker) {
         try {
           handle = await showSaveFilePicker({
-            suggestedName: "video.mp4",
+            suggestedName: data?.file_name || DEFAULT_FILE_NAME,
             types: [
               {
                 description: "MP4 video",
