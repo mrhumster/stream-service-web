@@ -9,8 +9,9 @@ import {
 import {
   DEFAULT_FILE_NAME,
   downloadStreamExport,
+  type DownloadProgress,
 } from "@/services/streamExportDownload";
-import { cn } from "@/lib/utils";
+import { cn, formatBytes } from "@/lib/utils";
 
 const base =
   "inline-flex items-center justify-center cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 font-bold";
@@ -22,7 +23,7 @@ type Phase =
   | { kind: "idle" }
   | { kind: "requesting" }
   | { kind: "pending" }
-  | { kind: "downloading" }
+  | { kind: "downloading"; progress: DownloadProgress | null }
   | { kind: "ready" }
   | { kind: "failed"; reason: string };
 
@@ -102,7 +103,32 @@ export function ExportDownloadButton({
   const handleDownload = async () => {
     const controller = new AbortController();
     abortRef.current = controller;
-    setPhase({ kind: "downloading" });
+    setPhase({ kind: "downloading", progress: null });
+    // The body arrives a chunk at a time, and a long stream is thousands of
+    // chunks, so a state update per chunk would re-render on every one of them
+    // for a number the user reads once per percent. Track what is on screen and
+    // only move when that changes.
+    let shownPercent = -1;
+    let lastReceived = 0;
+    const onProgress = (received: number, total: number) => {
+      lastReceived = received;
+      if (total <= 0) {
+        setPhase((prev) =>
+          prev.kind === "downloading" && prev.progress === null
+            ? prev
+            : { kind: "downloading", progress: { received, total } },
+        );
+        return;
+      }
+      const percent = Math.floor((received / total) * 100);
+      if (percent === shownPercent) return;
+      shownPercent = percent;
+      setPhase({
+        kind: "downloading",
+        progress: { received, total },
+      });
+    };
+
     try {
       let handle: FileSystemFileHandle | null = null;
       const showSaveFilePicker = window.showSaveFilePicker;
@@ -127,8 +153,12 @@ export function ExportDownloadButton({
         }
       }
 
-      const name = await downloadStreamExport(streamId, { handle });
-      toast.success(`Saved ${name}`);
+      const name = await downloadStreamExport(streamId, { handle, onProgress });
+      // The size is the one thing that says the whole file arrived, which the
+      // name alone does not.
+      toast.success(
+        lastReceived > 0 ? `Saved ${name} (${formatBytes(lastReceived)})` : `Saved ${name}`,
+      );
       setPhase({ kind: "ready" });
     } catch (error) {
       if ((error as Error)?.name === "AbortError") {
@@ -154,11 +184,23 @@ export function ExportDownloadButton({
     else void handleRequest();
   };
 
+  const progress =
+    effective.kind === "downloading" ? effective.progress : null;
+  const saving = effective.kind === "downloading";
+
+  // "3.2 / 7.6 MiB" reads better than "42%" once the file is large, and the
+  // percentage alone is useless when the server never said how big it is.
+  const progressText = progress
+    ? progress.total > 0
+      ? `${formatBytes(progress.received)} / ${formatBytes(progress.total)}`
+      : formatBytes(progress.received)
+    : null;
+
   const label = {
     idle: "Export MP4",
     requesting: "Starting",
     pending: "Preparing",
-    downloading: "Saving",
+    downloading: progressText ?? "Saving",
     ready: "Download",
     failed: "Retry",
   }[effective.kind];
@@ -167,8 +209,10 @@ export function ExportDownloadButton({
     idle: "Build a single-file MP4 of this stream",
     requesting: "Starting the export",
     pending: "The MP4 is being built. We will email you when it is ready.",
-    downloading: "Saving the file",
-    ready: data?.size ? `Download the MP4 (${formatSize(data.size)})` : "Download the MP4",
+    downloading: progressText
+      ? `Saving the file (${progressText})`
+      : "Saving the file",
+    ready: data?.size ? `Download the MP4 (${formatBytes(data.size)})` : "Download the MP4",
     failed: effective.kind === "failed" ? effective.reason : undefined,
   }[effective.kind];
 
@@ -188,19 +232,15 @@ export function ExportDownloadButton({
     >
       {busy ? <Loader className="size-5 animate-spin" /> : <Download className="size-5" />}
       {!iconOnly && <span className="hidden md:inline">{label}</span>}
+      {/* A button's label changing is not announced on its own, and the point of
+          the progress is to say the transfer is still going. */}
+      {saving && (
+        <span className="sr-only" aria-live="polite">
+          {progressText ?? "Saving the file"}
+        </span>
+      )}
     </button>
   );
-}
-
-function formatSize(bytes: number): string {
-  const units = ["B", "KiB", "MiB", "GiB", "TiB"];
-  let value = bytes;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit += 1;
-  }
-  return `${value.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
 }
 
 function describeApiError(message?: string): string {

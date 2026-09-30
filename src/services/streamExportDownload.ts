@@ -1,6 +1,7 @@
 import { eraseAuth, tokenReceived } from "../feature/auth/authSlice";
 import { store } from "../store/store";
 import type { LoginResponse } from "../types/auth.types";
+import { formatBytes } from "../lib/utils";
 
 /**
  * Streams the owner's MP4 straight to disk.
@@ -153,7 +154,75 @@ export interface DownloadExportOptions {
   /** A file handle chosen by the user, or null when the API is unavailable. */
   handle?: DownloadTarget | FileSystemFileHandle | null;
   signal?: AbortSignal;
+  /** Called per chunk with the bytes so far and the expected total, if known. */
   onProgress?: (received: number, total: number) => void;
+}
+
+/** Byte counts a caller can show to the user. */
+export interface DownloadProgress {
+  received: number;
+  /** Zero when the server did not say how big the file is. */
+  total: number;
+}
+
+/**
+ * Hands the body to `onChunk` a chunk at a time, reporting progress.
+ *
+ * Both save paths read through here: one writes straight to the handle the user
+ * picked, the other collects the chunks so they can become a blob for an anchor.
+ * The fallback therefore reports progress the same way instead of sitting
+ * silent for the whole transfer, which is the only feedback its users get.
+ */
+async function consumeBody(
+  response: Response,
+  onChunk: (chunk: Uint8Array) => Promise<void>,
+  onProgress?: (received: number, total: number) => void,
+): Promise<DownloadProgress> {
+  const body = response.body;
+  // A missing content-length is not an error, it just means there is no
+  // percentage to show, so the caller falls back to an indeterminate state.
+  const total = Number(response.headers.get("content-length") ?? 0) || 0;
+
+  if (!body) {
+    // No streaming body (older browsers, some proxies): one chunk.
+    const buffer = new Uint8Array(await response.arrayBuffer());
+    await onChunk(buffer);
+    onProgress?.(buffer.byteLength, buffer.byteLength || total);
+    return { received: buffer.byteLength, total };
+  }
+
+  const reader = body.getReader();
+  let received = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    received += value.byteLength;
+    onProgress?.(received, total);
+    await onChunk(value);
+  }
+  // The server cannot report a failure once the headers are on the wire, so a
+  // body that stops short of its own content-length is all the signal there is
+  // that the file is incomplete. Fail here rather than save it and claim
+  // success: the caller's cleanup aborts the write and nothing is left behind.
+  if (total > 0 && received < total) {
+    throw new IncompleteDownloadError(received, total);
+  }
+  return { received, total };
+}
+
+/** Thrown when the body ended before the size the response promised. */
+export class IncompleteDownloadError extends Error {
+  readonly received: number;
+  readonly expected: number;
+
+  constructor(received: number, expected: number) {
+    super(
+      `The download ended early: got ${formatBytes(received)} of ${formatBytes(expected)}.`,
+    );
+    this.name = "IncompleteDownloadError";
+    this.received = received;
+    this.expected = expected;
+  }
 }
 
 /**
@@ -178,31 +247,25 @@ export async function downloadStreamExport(
   // Without a handle there is nowhere to stream to, so the body has to be
   // buffered. Fine for a typical clip, not for a multi-gigabyte stream.
   if (!handle) {
-    const blob = await response.blob();
-    saveViaAnchor(blob, name);
+    const chunks: Uint8Array[] = [];
+    await consumeBody(
+      response,
+      async (chunk) => {
+        chunks.push(chunk);
+      },
+      onProgress,
+    );
+    saveViaAnchor(new Blob(chunks as BlobPart[]), name);
     return name;
   }
 
   const writable = await handle.createWritable();
   try {
-    const body = response.body;
-    if (body) {
-      const reader = body.getReader();
-      const total = Number(response.headers.get("content-length") ?? 0);
-      let received = 0;
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        received += value.byteLength;
-        onProgress?.(received, total);
-        await writable.write(value);
-      }
-    } else {
-      // No streaming body (older browsers, some proxies): write it in one go.
-      const buffer = await response.arrayBuffer();
-      onProgress?.(buffer.byteLength, buffer.byteLength);
-      await writable.write(buffer);
-    }
+    await consumeBody(
+      response,
+      (chunk) => writable.write(chunk),
+      onProgress,
+    );
     await writable.close();
   } catch (error) {
     // Leave no half-written file behind when the transfer fails.
