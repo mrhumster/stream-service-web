@@ -42,6 +42,7 @@ import type {
   StreamSortOrder,
 } from "@/types/stream.types";
 import { ShareButton } from "@/components/stream/share-button";
+import { ExportDownloadButton } from "@/components/stream/export-download-button";
 import { useAppDispatch, useAppSelector } from "@/hooks";
 import {
   selectOwnStreamsFilters,
@@ -570,6 +571,22 @@ export const OwnStreamsPage = () => {
                         iconOnly
                         className="scale-90"
                         url={`${window.location.origin}/streams/${stream.id}`}
+                      />
+                    )}
+                  </TableCell>
+
+                  {/* MP4 export / download. Only a transcoded stream has an
+                      HLS rendition to remux. */}
+                  <TableCell
+                    className="hidden lg:table-cell"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {(stream.status === "ready" ||
+                      stream.status === "published") && (
+                      <ExportDownloadButton
+                        streamId={stream.id}
+                        iconOnly
+                        className="scale-90"
                       />
                     )}
                   </TableCell>

@@ -1,5 +1,6 @@
 import type { Middleware } from "@reduxjs/toolkit";
 import type { UnknownAction } from "redux";
+import { toast } from "sonner";
 import { streamApi } from "../../services/streams";
 
 interface PartialRootState {
@@ -43,6 +44,25 @@ export const socketMiddleware: Middleware<object, PartialRootState> = (store) =>
           store.dispatch(
             streamApi.util.invalidateTags([{ type: "Stream", id: "LIST" }]),
           );
+        }
+        // The export worker finished out of band, so the cached status is the
+        // only way the page learns about it. Both outcomes arrive: a silent
+        // failure would strand the button on "Preparing".
+        if (data.type === "STREAM_EXPORT_READY") {
+          store.dispatch(
+            streamApi.util.invalidateTags([
+              { type: "StreamExport", id: data.payload?.stream_id },
+            ]),
+          );
+          toast.success("Your MP4 is ready to download");
+        }
+        if (data.type === "STREAM_EXPORT_FAILED") {
+          store.dispatch(
+            streamApi.util.invalidateTags([
+              { type: "StreamExport", id: data.payload?.stream_id },
+            ]),
+          );
+          toast.error(data.payload?.error || "The export failed.");
         }
       } catch (e) {
         console.error("WS parse error", e);

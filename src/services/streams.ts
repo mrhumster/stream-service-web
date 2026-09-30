@@ -21,6 +21,8 @@ import type {
   CompleteUploadRequest,
   FacesBatchResponse,
   FacesBatchRequest,
+  StreamExportResponse,
+  RequestStreamExportResponse,
 } from "../types/stream.types";
 
 const baseQuery = fetchBaseQuery({
@@ -59,7 +61,7 @@ const baseQueryWithReauth: BaseQueryFn<
 export const streamApi = createApi({
   reducerPath: "streamApi",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Stream"],
+  tagTypes: ["Stream", "StreamExport"],
   endpoints: (builder) => ({
     publishStream: builder.mutation<void, { id: string }>({
       query: ({ id }) => ({
@@ -302,6 +304,27 @@ export const streamApi = createApi({
         })),
       ],
     }),
+    requestStreamExport: builder.mutation<
+      RequestStreamExportResponse,
+      string
+    >({
+      query: (streamId) => ({
+        url: `stream/${streamId}/export`,
+        method: "POST",
+      }),
+      // The status only changes once the worker calls back, and that arrives
+      // over the WebSocket; refetching here would just read the pending row we
+      // already optimistically showed.
+      invalidatesTags: (_r, _e, streamId) => [
+        { type: "StreamExport" as const, id: streamId },
+      ],
+    }),
+    getStreamExport: builder.query<StreamExportResponse, string>({
+      query: (streamId) => `stream/${streamId}/export`,
+      providesTags: (_result, _error, streamId) => [
+        { type: "StreamExport" as const, id: streamId },
+      ],
+    }),
   }),
 });
 
@@ -322,4 +345,6 @@ export const {
   useReprocessStreamMutation,
   useProcessFacesStreamMutation,
   useDetectFacesBatchMutation,
+  useRequestStreamExportMutation,
+  useGetStreamExportQuery,
 } = streamApi;

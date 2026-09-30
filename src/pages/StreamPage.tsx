@@ -44,6 +44,7 @@ import { StreamSidebar } from "@/components/stream-sidebar";
 import type { StreamProcessingTask } from "@/types/stream.types";
 import { CommentsSection } from "@/components/comments/comments-section";
 import { ShareButton } from "@/components/stream/share-button";
+import { ExportDownloadButton } from "@/components/stream/export-download-button";
 import { PeopleBlock } from "@/components/faces/people-block";
 
 const pixelBtn =
@@ -300,6 +301,11 @@ export const StreamPage = () => {
                 <PenSquare className="size-5" />
                 <span className="hidden md:inline">Update Stream</span>
               </Link>
+              )}
+              {/* Only a transcoded stream has an HLS rendition to remux, and
+                  only the owner may export it. */}
+              {(isReady || isPublish) && (
+                <ExportDownloadButton streamId={stream.id} />
               )}
               {isReady || isPublish ? (
                 !stream.faces_detected ? (

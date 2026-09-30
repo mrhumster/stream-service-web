@@ -139,3 +139,19 @@ export interface MultipartPart {
   part_number: number;
   etag: string;
 }
+
+/* On-demand MP4 export (see services/transcoder-service/cmd/exporter). The
+ * status mirrors the row stream-service owns; the worker never writes it. */
+export type StreamExportStatus = "pending" | "ready" | "failed";
+
+export interface StreamExportResponse {
+  status: StreamExportStatus;
+  size: number;
+  error: string;
+  /** False until someone asks for the export; pending alone cannot say so. */
+  requested: boolean;
+}
+
+export interface RequestStreamExportResponse {
+  task_id: string;
+}
