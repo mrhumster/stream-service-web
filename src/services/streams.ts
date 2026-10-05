@@ -21,6 +21,8 @@ import type {
   CompleteUploadRequest,
   FacesBatchResponse,
   FacesBatchRequest,
+  ForceErrorBatchResponse,
+  ForceErrorBatchRequest,
   StreamExportResponse,
   RequestStreamExportResponse,
 } from "../types/stream.types";
@@ -277,6 +279,33 @@ export const streamApi = createApi({
         { type: "Stream" as const, id: "LIST" },
       ],
     }),
+    forceStreamError: builder.mutation<void, { id: string }>({
+      query: ({ id }) => ({
+        url: `stream/${id}/force-error`,
+        method: "POST",
+      }),
+      invalidatesTags: (_res, _err, { id }) => [
+        { type: "Stream" as const, id },
+        { type: "Stream" as const, id: "LIST" },
+      ],
+    }),
+    forceStreamErrorBatch: builder.mutation<
+      ForceErrorBatchResponse,
+      ForceErrorBatchRequest
+    >({
+      query: (body) => ({
+        url: "stream/force-error/batch",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (res) => [
+        { type: "Stream" as const, id: "LIST" },
+        ...(res?.processed ?? []).map((id) => ({
+          type: "Stream" as const,
+          id,
+        })),
+      ],
+    }),
     processFacesStream: builder.mutation<void, { id: string }>({
       query: ({ id }) => ({
         url: `stream/${id}/faces`,
@@ -343,6 +372,8 @@ export const {
   usePublishStreamMutation,
   useUnpublishStreamMutation,
   useReprocessStreamMutation,
+  useForceStreamErrorMutation,
+  useForceStreamErrorBatchMutation,
   useProcessFacesStreamMutation,
   useDetectFacesBatchMutation,
   useRequestStreamExportMutation,

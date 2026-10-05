@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import {
   useListOwnStreamsQuery,
   useDetectFacesBatchMutation,
+  useForceStreamErrorBatchMutation,
 } from "@/services/streams";
 import { toast } from "sonner";
 import {
@@ -16,7 +17,7 @@ import {
   thumbnailUrl,
 } from "@/lib/stream-format";
 import { cn } from "@/lib/utils";
-import { Plus, Loader2, LayoutGrid, List, ChevronUp, ChevronDown, Image, Filter, User } from "lucide-react";
+import { Plus, Loader2, LayoutGrid, List, ChevronUp, ChevronDown, Image, Filter, User, Siren } from "lucide-react";
 import {
   Table,
   TableHeader,
@@ -25,6 +26,14 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -54,6 +63,9 @@ import {
 } from "@/feature/ownStreams/ownStreamsFiltersSlice";
 
 const PAGE_SIZE = 50;
+
+// Must match the cap the stream-service batch endpoint enforces.
+const FORCE_ERROR_CHUNK = 100;
 
 const STATUS_OPTIONS: StreamStatus[] = ["draft", "processing", "ready", "published", "error"];
 
@@ -128,6 +140,9 @@ export const OwnStreamsPage = () => {
 
   const [detectFacesBatch, { isLoading: isBatchLoading }] =
     useDetectFacesBatchMutation();
+  const [forceErrorBatch, { isLoading: isForceBatchLoading }] =
+    useForceStreamErrorBatchMutation();
+  const [confirmForceError, setConfirmForceError] = useState(false);
 
   const { data, isLoading, isFetching, error } = useListOwnStreamsQuery({
     limit: PAGE_SIZE,
@@ -166,6 +181,12 @@ export const OwnStreamsPage = () => {
     .filter((s) => !s.faces_detected)
     .map((s) => s.id);
 
+  // Selection spans infinite-scroll pages, so a batch can be longer than the
+  // server-side cap of 100. Only streams still processing can be forced.
+  const stuckIds = selectedStreams
+    .filter((s) => s.status === "processing")
+    .map((s) => s.id);
+
   const clearSelection = () => setSelectedIds(new Set());
 
   const handleDetectFacesBatch = async () => {
@@ -179,6 +200,33 @@ export const OwnStreamsPage = () => {
       clearSelection();
     } catch {
       toast.error("Failed to start face detection");
+    }
+  };
+
+  const handleForceErrorBatch = async () => {
+    if (stuckIds.length === 0) return;
+    setConfirmForceError(false);
+    try {
+      let processed = 0;
+      const failures = new Set<string>();
+      for (let i = 0; i < stuckIds.length; i += FORCE_ERROR_CHUNK) {
+        const chunk = stuckIds.slice(i, i + FORCE_ERROR_CHUNK);
+        const res = await forceErrorBatch({ ids: chunk }).unwrap();
+        processed += res.processed.length;
+        res.failed.forEach((f) => failures.add(f.reason));
+      }
+      if (failures.size > 0) {
+        toast.error(
+          `Marked ${processed} stream${processed === 1 ? "" : "s"} as failed. Skipped: ${[...failures].join(", ")}`,
+        );
+      } else {
+        toast.success(
+          `Marked ${processed} stream${processed === 1 ? "" : "s"} as failed`,
+        );
+      }
+      clearSelection();
+    } catch {
+      toast.error("Failed to mark streams as failed");
     }
   };
 
@@ -366,6 +414,12 @@ export const OwnStreamsPage = () => {
                 · {eligibleIds.length} ready for detection
               </>
             )}
+            {stuckIds.length > 0 && (
+              <>
+                {" "}
+                · {stuckIds.length} stuck processing
+              </>
+            )}
           </span>
           <button
             type="button"
@@ -385,6 +439,22 @@ export const OwnStreamsPage = () => {
           </button>
           <button
             type="button"
+            disabled={stuckIds.length === 0 || isForceBatchLoading}
+            onClick={() => setConfirmForceError(true)}
+            className={cn(
+              "inline-flex items-center gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold disabled:opacity-50 disabled:pointer-events-none",
+            )}
+          >
+            {isForceBatchLoading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Siren className="size-4" />
+            )}
+            Mark As Failed
+            {stuckIds.length > 0 && ` (${stuckIds.length})`}
+          </button>
+          <button
+            type="button"
             onClick={clearSelection}
             className="inline-flex items-center gap-2 bg-card text-card-foreground hover:bg-accent border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold"
           >
@@ -392,6 +462,38 @@ export const OwnStreamsPage = () => {
           </button>
         </div>
       )}
+
+      <Dialog open={confirmForceError} onOpenChange={setConfirmForceError}>
+        <DialogContent className="border-4 border-destructive shadow-[8px_8px_0_0_rgba(0,0,0,1)] rounded-none max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-sm uppercase tracking-wider">
+              Mark {stuckIds.length} stream{stuckIds.length === 1 ? "" : "s"} as
+              failed?
+            </DialogTitle>
+            <DialogDescription className="text-xs uppercase tracking-wider">
+              This stops the running tasks and marks the selected streams as
+              failed, so you can reprocess them.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 bg-card text-card-foreground hover:bg-accent border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold"
+              onClick={() => setConfirmForceError(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold"
+              disabled={isForceBatchLoading}
+              onClick={handleForceErrorBatch}
+            >
+              Mark As Failed
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Loading */}
       {isLoading && (

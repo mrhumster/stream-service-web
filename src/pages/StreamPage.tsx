@@ -18,6 +18,7 @@ import {
   usePublishStreamMutation,
   useUnpublishStreamMutation,
   useReprocessStreamMutation,
+  useForceStreamErrorMutation,
   useProcessFacesStreamMutation,
 } from "@/services/streams";
 import { useVideoUrl } from "@/hooks/useVideoUrl";
@@ -28,7 +29,7 @@ import {
 } from "@/lib/stream-format";
 import { useAppSelector } from "@/hooks";
 import { cn, getErrorMessage } from "@/lib/utils";
-import { ArrowLeft, Lock, PenSquare, Delete, Globe, Reload, User } from "pixelarticons/react";
+import { ArrowLeft, Lock, PenSquare, Delete, Globe, Reload, User, Siren } from "pixelarticons/react";
 import { HLSPlayer } from "@/components/hls-player";
 import ProgressBar from "@/components/ui/8bit/progress-bar";
 import { parseLocation } from "@/lib/parse-location";
@@ -81,10 +82,12 @@ export const StreamPage = () => {
     useUnpublishStreamMutation();
   const [reprocessStream, { isLoading: isReprocessing }] =
     useReprocessStreamMutation();
+  const [forceStreamError, { isLoading: isForcingError }] =
+    useForceStreamErrorMutation();
   const [processFaces, { isLoading: isProcessingFaces }] =
     useProcessFacesStreamMutation();
   const [confirmAction, setConfirmAction] = useState<
-    "publish" | "unpublish" | "delete" | null
+    "publish" | "unpublish" | "delete" | "force-error" | null
   >(null);
   const [mapOpen, setMapOpen] = useState(false);
 
@@ -158,6 +161,18 @@ export const StreamPage = () => {
     try {
       await reprocessStream({ id: stream!.id }).unwrap();
       toast.success("Processing restarted");
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
+  };
+
+  // A stream whose worker died stays in processing forever: only a worker
+  // reporting its own failure writes the error state that Reprocess requires.
+  // This gives the owner a way out, after which Reprocess is available.
+  const handleForceError = async () => {
+    try {
+      await forceStreamError({ id: stream!.id }).unwrap();
+      toast.success("Marked as failed. You can now reprocess it.");
     } catch (err) {
       toast.error(getErrorMessage(err));
     }
@@ -259,6 +274,19 @@ export const StreamPage = () => {
                         </div>
                       ))}
                     </div>
+                  )}
+                  {(isOwner || isAdmin) && (
+                    <button
+                      onClick={() => setConfirmAction("force-error")}
+                      disabled={isForcingError}
+                      aria-label="Mark as failed"
+                      className={`${pixelBtnDestructive} cursor-pointer disabled:opacity-50`}
+                    >
+                      <Siren className="size-5" />
+                      <span className="hidden md:inline">
+                        {isForcingError ? "Stopping..." : "Mark as failed"}
+                      </span>
+                    </button>
                   )}
                 </>
               )}
@@ -371,14 +399,18 @@ export const StreamPage = () => {
                         ? "Publish stream?"
                         : confirmAction === "unpublish"
                           ? "Unpublish stream?"
-                          : "Delete stream?"}
+                          : confirmAction === "force-error"
+                            ? "Mark as failed?"
+                            : "Delete stream?"}
                     </DialogTitle>
                     <DialogDescription className="text-xs uppercase tracking-wider">
                       {confirmAction === "publish"
                         ? "This will make the stream publicly available."
                         : confirmAction === "unpublish"
                           ? "This will make the stream private again."
-                          : "This action cannot be undone."}
+                          : confirmAction === "force-error"
+                            ? "Stops the running tasks and marks the stream as failed, so you can reprocess it."
+                            : "This action cannot be undone."}
                     </DialogDescription>
                   </DialogHeader>
                   <DialogFooter>
@@ -392,14 +424,16 @@ export const StreamPage = () => {
                     <button
                       type="button"
                       className={
-                        confirmAction === "delete"
+                        confirmAction === "delete" ||
+                        confirmAction === "force-error"
                           ? pixelBtnDestructive
                           : pixelBtn
                       }
                       disabled={
                         (confirmAction === "publish" && isPublished) ||
                         (confirmAction === "unpublish" && isUnpublished) ||
-                        (confirmAction === "delete" && isDeleting)
+                        (confirmAction === "delete" && isDeleting) ||
+                        (confirmAction === "force-error" && isForcingError)
                       }
                       onClick={async () => {
                         const action = confirmAction;
@@ -411,6 +445,8 @@ export const StreamPage = () => {
                           } else if (action === "delete") {
                             await deleteStream(stream.id).unwrap();
                             navigate("/streams");
+                          } else if (action === "force-error") {
+                            await handleForceError();
                           }
                           setConfirmAction(null);
                         } catch (err) {
@@ -426,9 +462,13 @@ export const StreamPage = () => {
                           ? isUnpublished
                             ? "Unpublishing..."
                             : "Unpublish"
-                          : isDeleting
-                            ? "Deleting..."
-                            : "Delete"}
+                          : confirmAction === "force-error"
+                            ? isForcingError
+                              ? "Stopping..."
+                              : "Mark as failed"
+                            : isDeleting
+                              ? "Deleting..."
+                              : "Delete"}
                     </button>
                   </DialogFooter>
                 </DialogContent>
