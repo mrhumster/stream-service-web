@@ -316,7 +316,11 @@ export const StreamPage = () => {
           )}
 
           {(isOwner || stream.visibility === "unlisted") && (
-            <div className="flex items-center gap-2 mb-6">
+            // The labels only appear from md up, where five of them add up to
+            // more than the row is wide. `flex-wrap` puts a whole button on the
+            // next line instead of letting one of them grow a second line of its
+            // own.
+            <div className="flex flex-wrap items-center gap-2 mb-6">
               {stream.visibility === "unlisted" && <ShareButton />}
               {isOwner && (
               <>

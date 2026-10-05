@@ -13,8 +13,13 @@ import {
 } from "@/services/streamExportDownload";
 import { cn, formatBytes } from "@/lib/utils";
 
+// `whitespace-nowrap` and `min-w-9` are what hold the label on one line. A flex
+// row shrinks its items and an item may shrink below its content, so without
+// them the min-content width is just the longest word ("Export", "MP4"): the
+// label then breaks onto a second line and the button grows taller than the
+// buttons next to it.
 const base =
-  "inline-flex items-center justify-center cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 font-bold";
+  "inline-flex items-center justify-center cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 min-w-9 font-bold whitespace-nowrap";
 
 /** The worker callback drives the transition; this only covers a dropped socket. */
 const POLL_WHILE_PENDING_MS = 5000;

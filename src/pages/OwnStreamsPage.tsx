@@ -683,6 +683,11 @@ export const OwnStreamsPage = () => {
                 </button>
               </TableHead>
               <TableHead className="w-16 hidden md:table-cell">Link</TableHead>
+              {/* The actions column has no label, but it still needs a head: a
+                  body cell with no column to land in becomes an anonymous one,
+                  which takes its width from content and leaves the header one
+                  cell short of the row. */}
+              <TableHead className="w-14 hidden sm:table-cell" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -771,7 +776,7 @@ export const OwnStreamsPage = () => {
                       a transcoded one gets an MP4 export; the two are mutually
                       exclusive, so they share one cell. */}
                   <TableCell
-                    className="hidden sm:table-cell"
+                    className="hidden sm:table-cell p-1.5"
                     onClick={(e) => e.stopPropagation()}
                   >
                     {stream.status === "error" ? (
@@ -781,7 +786,7 @@ export const OwnStreamsPage = () => {
                         disabled={reprocessingId === stream.id}
                         aria-label="Reprocess"
                         title="Send this stream back to the workers"
-                        className="inline-flex items-center justify-center w-9 shrink-0 cursor-pointer bg-accent text-accent-foreground hover:bg-accent/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 font-bold disabled:opacity-50 disabled:pointer-events-none"
+                        className="inline-flex items-center justify-center w-9 shrink-0 scale-90 cursor-pointer bg-accent text-accent-foreground hover:bg-accent/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 font-bold disabled:opacity-50 disabled:pointer-events-none"
                       >
                         {reprocessingId === stream.id ? (
                           <Loader2 className="size-5 animate-spin" />
