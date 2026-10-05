@@ -73,6 +73,11 @@ UI is styled as a retro 8-bit pixel art interface with support for three themes:
   persisted to `localStorage` (`gocast-own-streams-filters`), so they survive navigation;
 - **Batch face detection:** multiselect (checkboxes in grid and table) → `Detect Faces (N of M)`
   posts one `POST stream/faces/batch` request for all selected streams without detections;
+- **Reprocess failed streams:** an `error` row in the table carries a reprocess button, and a
+  multiselect of failed streams can be restarted together from the batch toolbar via
+  `POST stream/reprocess/batch`. Both report why the service refused: the single click shows the
+  server message verbatim (a `409` means the source file was removed and the stream has to be
+  uploaded again), the bulk one collects the per-id reasons and summarises them in one toast;
 - **Edit page** with HLS player preview for ready/published streams;
 - **Mobile responsive:** hamburger nav, hidden columns on small screens;
 - **Toast notifications** (Sonner, styled as 8-bit pixel toasts);
@@ -195,7 +200,7 @@ src/
 │   ├── ErrorPage.tsx           # root errorElement (pixel style)
 │   ├── HelpPage.tsx            # static help guide (/help)
 │   ├── MainPage.tsx            # ⚠ dead code — legacy landing page, not routed (`/` → StreamsPage)
-│   ├── OwnStreamsPage.tsx      # table/grid, server filters/sort, batch face detection
+│   ├── OwnStreamsPage.tsx      # table/grid, server filters/sort, batch face detection, reprocess
 │   ├── PeoplePage.tsx          # face clusters (/people)
 │   ├── PeopleDetailPage.tsx    # cluster detail + rename/merge (/people/:id)
 │   ├── StreamPage.tsx          # detail + player + owner actions
@@ -431,6 +436,9 @@ pnpm dev
   navigation; filter-dependent empty state with **Reset filters** — 2026-09-25;
 - **Batch face detection:** multiselect streams (grid + table) → **Detect Faces (N of M)**,
   one batch request instead of N — 2026-09-25;
+- **Reprocess from the list:** reprocess button on an `error` table row + **Reprocess (N)**
+  bulk action for a failed selection (`POST stream/reprocess/batch`, new endpoint), server
+  reasons surfaced in the toast — 2026-10-05;
 - **People («Свои люди»):** Detect Faces button on stream page (owner/admin) +
   `faces` task chip, `/people` cluster list, `/people/:clusterId` detail with rename,
   `VITE_FACES_URL` — 2026-09-22;
