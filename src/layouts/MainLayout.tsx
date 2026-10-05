@@ -1,5 +1,5 @@
 import { Link, Outlet } from "react-router-dom";
-import { Menu, Sun, Star, Moon, Monitor, ChevronDown, ShieldAlert, Activity as ActivityIcon, Users as UsersIcon } from "lucide-react";
+import { Menu, Sun, Star, Moon, Monitor, ChevronDown, ShieldAlert, Film, Library, CircleHelp, Activity as ActivityIcon, Users as UsersIcon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -45,6 +45,10 @@ export const MainLayout = () => {
     { value: "dark", label: "Dark", icon: <Moon className="size-4" /> },
     { value: "system", label: "System", icon: <Monitor className="size-4" /> },
   ];
+
+  const NAV_LINK_CLASS =
+    "inline-flex items-center gap-1.5 px-1.5 py-0.5 uppercase font-bold hover:text-primary hover:underline underline-offset-4 decoration-4 transition-colors";
+
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       <header className="border-b-4 border-primary p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.1)]">
@@ -59,181 +63,172 @@ export const MainLayout = () => {
 
           {/* Навигация и Смена темы */}
           <nav className="flex items-center gap-6">
-            <ul className="hidden md:flex gap-4 text-xs items-center">
+            <ul className="hidden md:flex gap-5 text-xs items-center">
               <li>
-                <Link
-                  to="/streams"
-                  className="uppercase font-bold hover:text-primary hover:underline underline-offset-4 decoration-4 transition-colors"
-                >
+                <Link to="/streams" className={NAV_LINK_CLASS}>
+                  <Film className="size-3.5" />
                   Streams
                 </Link>
               </li>
-              <li>
-                <Link
-                  to="/help"
-                  className="uppercase font-bold hover:text-primary hover:underline underline-offset-4 decoration-4 transition-colors"
-                >
-                  Help
-                </Link>
-              </li>
-              {auth.isAuth ? (
+              {auth.isAuth && (
                 <>
                   <li className="flex items-center gap-3">
-                    <Link
-                      to="/streams/own"
-                      className="uppercase font-bold hover:text-primary hover:underline underline-offset-4 decoration-4 transition-colors"
-                    >
+                    <Link to="/streams/own" className={NAV_LINK_CLASS}>
+                      <Library className="size-3.5" />
                       My Videos
                     </Link>
                   </li>
                   <li className="flex items-center gap-3">
-                    <Link
-                      to="/activity"
-                      className="inline-flex items-center gap-1.5 uppercase font-bold hover:text-primary hover:underline underline-offset-4 decoration-4 transition-colors"
-                    >
+                    <Link to="/activity" className={NAV_LINK_CLASS}>
                       <ActivityIcon className="size-3.5" />
                       Activity
                     </Link>
                   </li>
                   <li className="flex items-center gap-3">
-                    <Link
-                      to="/people"
-                      className="inline-flex items-center gap-1.5 uppercase font-bold hover:text-primary hover:underline underline-offset-4 decoration-4 transition-colors"
-                    >
+                    <Link to="/people" className={NAV_LINK_CLASS}>
                       <UsersIcon className="size-3.5" />
                       People
                     </Link>
                   </li>
-                  <li className="flex items-center gap-3">
-                    <Dialog
-                      open={isProfileOpen}
-                      onOpenChange={setIsProfileOpen}
-                    >
-                      <DialogTrigger asChild>
-                        <button className="uppercase font-bold hover:text-primary hover:underline underline-offset-4 decoration-4 transition-colors">
-                          {data?.email}
-                        </button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-[425px] border-4 border-primary shadow-[8px_8px_0_0_rgba(0,0,0,1)] bg-card p-0 overflow-hidden [&_[data-slot=dialog-close]]:text-primary-foreground [&_[data-slot=dialog-close]]:opacity-100">
-                        <DialogHeader className="bg-primary p-4 border-b-4 border-black">
-                          <DialogTitle className="text-primary-foreground text-xs uppercase tracking-tighter">
-                            Profile
-                          </DialogTitle>
-                        </DialogHeader>
-                        <div className="p-6 flex flex-col gap-4">
+                </>
+              )}
+              <li>
+                <Link to="/help" className={NAV_LINK_CLASS}>
+                  <CircleHelp className="size-3.5" />
+                  Help
+                </Link>
+              </li>
+              {auth.isAuth && (
+                <li className="flex items-center gap-3">
+                  <Dialog
+                    open={isProfileOpen}
+                    onOpenChange={setIsProfileOpen}
+                  >
+                    <DialogTrigger asChild>
+                      <button className="uppercase font-bold hover:text-primary hover:underline underline-offset-4 decoration-4 transition-colors">
+                        {data?.email}
+                      </button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px] border-4 border-primary shadow-[8px_8px_0_0_rgba(0,0,0,1)] bg-card p-0 overflow-hidden [&_[data-slot=dialog-close]]:text-primary-foreground [&_[data-slot=dialog-close]]:opacity-100">
+                      <DialogHeader className="bg-primary p-4 border-b-4 border-black">
+                        <DialogTitle className="text-primary-foreground text-xs uppercase tracking-tighter">
+                          Profile
+                        </DialogTitle>
+                      </DialogHeader>
+                      <div className="p-6 flex flex-col gap-4">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-muted-foreground">
+                            Email
+                          </span>
+                          <p className="text-sm mt-1">{data?.email}</p>
+                          {data && data.email_verified === false && data.role !== "admin" && (
+                            <Link
+                              to="/verify"
+                              className="inline-flex items-center gap-1 mt-1 text-[10px] uppercase font-bold text-yellow-600 hover:underline"
+                            >
+                              <ShieldAlert className="size-3" />
+                              Unverified — verify email
+                            </Link>
+                          )}
+                        </div>
+                        <div className="flex gap-6 text-[10px] uppercase text-muted-foreground border-t-2 border-foreground/10 pt-3">
                           <div>
-                            <span className="text-[10px] uppercase font-bold text-muted-foreground">
-                              Email
-                            </span>
-                            <p className="text-sm mt-1">{data?.email}</p>
-                            {data && data.email_verified === false && data.role !== "admin" && (
-                              <Link
-                                to="/verify"
-                                className="inline-flex items-center gap-1 mt-1 text-[10px] uppercase font-bold text-yellow-600 hover:underline"
-                              >
-                                <ShieldAlert className="size-3" />
-                                Unverified — verify email
-                              </Link>
-                            )}
+                            <span className="font-bold">Created:</span>{" "}
+                            {data?.created_at &&
+                              new Date(data.created_at).toLocaleDateString(
+                                "en-US",
+                                {
+                                  year: "numeric",
+                                  month: "short",
+                                  day: "numeric",
+                                },
+                              )}
                           </div>
-                          <div className="flex gap-6 text-[10px] uppercase text-muted-foreground border-t-2 border-foreground/10 pt-3">
-                            <div>
-                              <span className="font-bold">Created:</span>{" "}
-                              {data?.created_at &&
-                                new Date(data.created_at).toLocaleDateString(
-                                  "en-US",
-                                  {
-                                    year: "numeric",
-                                    month: "short",
-                                    day: "numeric",
-                                  },
-                                )}
-                            </div>
-                            <div>
-                              <span className="font-bold">Updated:</span>{" "}
-                              {data?.updated_at &&
-                                new Date(data.updated_at).toLocaleDateString(
-                                  "en-US",
-                                  {
-                                    year: "numeric",
-                                    month: "short",
-                                    day: "numeric",
-                                  },
-                                )}
-                            </div>
-                          </div>
-
-                          <div className="border-t-2 border-foreground/10 pt-4 flex flex-col gap-3">
-                            <span className="text-[10px] uppercase font-bold text-muted-foreground">
-                              Settings
-                            </span>
-
-                            {/* Autoplay toggle */}
-                            <label className="flex items-center justify-between cursor-pointer">
-                              <span className="text-sm font-bold uppercase">Autoplay</span>
-                              <button
-                                type="button"
-                                role="switch"
-                                aria-checked={autoplay}
-                                onClick={() => dispatch(setAutoplay(!autoplay))}
-                                className={`relative inline-flex h-6 w-11 items-center rounded-none border-2 border-black transition-colors ${
-                                  autoplay ? "bg-green-600" : "bg-muted"
-                                }`}
-                              >
-                                <span
-                                  className={`inline-block h-4 w-4 bg-white shadow transition-transform ${
-                                    autoplay ? "translate-x-5" : "translate-x-1"
-                                  }`}
-                                />
-                              </button>
-                            </label>
-
-                            {/* Theme dropdown */}
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-bold uppercase">Theme</span>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <button className="flex items-center gap-2 border-2 border-black px-3 py-1 text-xs uppercase font-bold bg-background hover:bg-accent transition-colors">
-                                    {themeOptions.find((o) => o.value === themeSetting)?.label}
-                                    <ChevronDown className="size-3" />
-                                  </button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  {themeOptions.map((opt) => (
-                                    <DropdownMenuItem
-                                      key={opt.value}
-                                      onSelect={() => {
-                                        dispatch(setTheme(opt.value));
-                                        applyTheme(opt.value);
-                                      }}
-                                    >
-                                      <span className="flex items-center gap-2">
-                                        {opt.icon}
-                                        {opt.label}
-                                        {themeSetting === opt.value && <span className="ml-auto">✓</span>}
-                                      </span>
-                                    </DropdownMenuItem>
-                                  ))}
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
+                          <div>
+                            <span className="font-bold">Updated:</span>{" "}
+                            {data?.updated_at &&
+                              new Date(data.updated_at).toLocaleDateString(
+                                "en-US",
+                                {
+                                  year: "numeric",
+                                  month: "short",
+                                  day: "numeric",
+                                },
+                              )}
                           </div>
                         </div>
-                      </DialogContent>
-                    </Dialog>
-                    <button
-                      onClick={() =>
-                        void logout()
-                          .unwrap()
-                          .finally(() => dispatch(eraseAuth()))
-                      }
-                      className="bg-destructive text-destructive-foreground px-4 py-1 text-[10px] uppercase font-bold shadow-[4px_4px_0_0_rgba(0,0,0,0.2)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]"
-                    >
-                      Logout
-                    </button>
-                  </li>
-                </>
-              ) : (
+
+                        <div className="border-t-2 border-foreground/10 pt-4 flex flex-col gap-3">
+                          <span className="text-[10px] uppercase font-bold text-muted-foreground">
+                            Settings
+                          </span>
+
+                          {/* Autoplay toggle */}
+                          <label className="flex items-center justify-between cursor-pointer">
+                            <span className="text-sm font-bold uppercase">Autoplay</span>
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={autoplay}
+                              onClick={() => dispatch(setAutoplay(!autoplay))}
+                              className={`relative inline-flex h-6 w-11 items-center rounded-none border-2 border-black transition-colors ${
+                                autoplay ? "bg-green-600" : "bg-muted"
+                              }`}
+                            >
+                              <span
+                                className={`inline-block h-4 w-4 bg-white shadow transition-transform ${
+                                  autoplay ? "translate-x-5" : "translate-x-1"
+                                }`}
+                              />
+                            </button>
+                          </label>
+
+                          {/* Theme dropdown */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-bold uppercase">Theme</span>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button className="flex items-center gap-2 border-2 border-black px-3 py-1 text-xs uppercase font-bold bg-background hover:bg-accent transition-colors">
+                                  {themeOptions.find((o) => o.value === themeSetting)?.label}
+                                  <ChevronDown className="size-3" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {themeOptions.map((opt) => (
+                                  <DropdownMenuItem
+                                    key={opt.value}
+                                    onSelect={() => {
+                                      dispatch(setTheme(opt.value));
+                                      applyTheme(opt.value);
+                                    }}
+                                  >
+                                    <span className="flex items-center gap-2">
+                                      {opt.icon}
+                                      {opt.label}
+                                      {themeSetting === opt.value && <span className="ml-auto">✓</span>}
+                                    </span>
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                  <button
+                    onClick={() =>
+                      void logout()
+                        .unwrap()
+                        .finally(() => dispatch(eraseAuth()))
+                    }
+                    className="bg-destructive text-destructive-foreground px-4 py-1 text-[10px] uppercase font-bold shadow-[4px_4px_0_0_rgba(0,0,0,0.2)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]"
+                  >
+                    Logout
+                  </button>
+                </li>
+              )}
+              {!auth.isAuth && (
                 <Dialog
                   open={isModalOpen}
                   onOpenChange={(open) => {
@@ -291,26 +286,41 @@ export const MainLayout = () => {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem asChild>
-                    <Link to="/streams">Streams</Link>
+                    <Link to="/streams">
+                      <Film className="size-4" />
+                      Streams
+                    </Link>
                   </DropdownMenuItem>
+                  {auth.isAuth && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/streams/own">
+                        <Library className="size-4" />
+                        My Videos
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  {auth.isAuth && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/activity">
+                        <ActivityIcon className="size-4" />
+                        Activity
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  {auth.isAuth && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/people">
+                        <UsersIcon className="size-4" />
+                        People
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem asChild>
-                    <Link to="/help">Help</Link>
+                    <Link to="/help">
+                      <CircleHelp className="size-4" />
+                      Help
+                    </Link>
                   </DropdownMenuItem>
-                  {auth.isAuth && (
-                    <DropdownMenuItem asChild>
-                      <Link to="/streams/own">My Videos</Link>
-                    </DropdownMenuItem>
-                  )}
-                  {auth.isAuth && (
-                    <DropdownMenuItem asChild>
-                      <Link to="/activity">Activity</Link>
-                    </DropdownMenuItem>
-                  )}
-                  {auth.isAuth && (
-                    <DropdownMenuItem asChild>
-                      <Link to="/people">People</Link>
-                    </DropdownMenuItem>
-                  )}
                   {auth.isAuth ? (
                     <DropdownMenuItem
                       variant="destructive"
