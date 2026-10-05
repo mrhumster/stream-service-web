@@ -6,6 +6,8 @@ import {
   useListOwnStreamsQuery,
   useDetectFacesBatchMutation,
   useForceStreamErrorBatchMutation,
+  useReprocessStreamMutation,
+  useReprocessStreamBatchMutation,
 } from "@/services/streams";
 import { toast } from "sonner";
 import {
@@ -16,8 +18,9 @@ import {
   defaultStatus,
   thumbnailUrl,
 } from "@/lib/stream-format";
-import { cn } from "@/lib/utils";
-import { Plus, Loader2, LayoutGrid, List, ChevronUp, ChevronDown, Image, Filter, User, Siren } from "lucide-react";
+import { cn, getErrorMessage } from "@/lib/utils";
+import { Plus, Loader2, LayoutGrid, List, ChevronUp, ChevronDown, Image, Filter, User, Siren, RefreshCw } from "lucide-react";
+import { Reload } from "pixelarticons/react";
 import {
   Table,
   TableHeader,
@@ -64,10 +67,23 @@ import {
 
 const PAGE_SIZE = 50;
 
-// Must match the cap the stream-service batch endpoint enforces.
-const FORCE_ERROR_CHUNK = 100;
+// Must match the cap the stream-service batch endpoints enforce.
+const BATCH_CHUNK = 100;
 
 const STATUS_OPTIONS: StreamStatus[] = ["draft", "processing", "ready", "published", "error"];
+
+// The batch endpoint reports why a stream refused. The raw reasons are written
+// for the API, so they are translated before they reach a toast.
+const REPROCESS_REASON_TEXT: Record<string, string> = {
+  forbidden: "forbidden",
+  "not found": "not found",
+  "not failed": "already processing",
+  "source removed": "source removed, re-upload required",
+  "internal error": "internal error",
+};
+
+const reprocessReasonText = (reason: string) =>
+  REPROCESS_REASON_TEXT[reason] ?? reason;
 
 function ThumbCell({ stream }: { stream: StreamResponse }) {
   const [broken, setBroken] = useState(false);
@@ -142,7 +158,13 @@ export const OwnStreamsPage = () => {
     useDetectFacesBatchMutation();
   const [forceErrorBatch, { isLoading: isForceBatchLoading }] =
     useForceStreamErrorBatchMutation();
+  const [reprocessBatch, { isLoading: isReprocessBatchLoading }] =
+    useReprocessStreamBatchMutation();
+  const [reprocessStream] = useReprocessStreamMutation();
   const [confirmForceError, setConfirmForceError] = useState(false);
+  // A mutation hook has a single isLoading for the whole page, so the row that
+  // was clicked is tracked by id instead.
+  const [reprocessingId, setReprocessingId] = useState<string | null>(null);
 
   const { data, isLoading, isFetching, error } = useListOwnStreamsQuery({
     limit: PAGE_SIZE,
@@ -187,6 +209,12 @@ export const OwnStreamsPage = () => {
     .filter((s) => s.status === "processing")
     .map((s) => s.id);
 
+  // The other end of the round trip: a stream that failed can be sent back to
+  // the workers straight from the list.
+  const errorIds = selectedStreams
+    .filter((s) => s.status === "error")
+    .map((s) => s.id);
+
   const clearSelection = () => setSelectedIds(new Set());
 
   const handleDetectFacesBatch = async () => {
@@ -209,8 +237,8 @@ export const OwnStreamsPage = () => {
     try {
       let processed = 0;
       const failures = new Set<string>();
-      for (let i = 0; i < stuckIds.length; i += FORCE_ERROR_CHUNK) {
-        const chunk = stuckIds.slice(i, i + FORCE_ERROR_CHUNK);
+      for (let i = 0; i < stuckIds.length; i += BATCH_CHUNK) {
+        const chunk = stuckIds.slice(i, i + BATCH_CHUNK);
         const res = await forceErrorBatch({ ids: chunk }).unwrap();
         processed += res.processed.length;
         res.failed.forEach((f) => failures.add(f.reason));
@@ -227,6 +255,46 @@ export const OwnStreamsPage = () => {
       clearSelection();
     } catch {
       toast.error("Failed to mark streams as failed");
+    }
+  };
+
+  const handleReprocess = async (id: string) => {
+    setReprocessingId(id);
+    try {
+      await reprocessStream({ id }).unwrap();
+      toast.success("Processing restarted");
+    } catch (err) {
+      // The service explains a refusal, e.g. the source file was removed and
+      // the stream has to be uploaded again.
+      toast.error(getErrorMessage(err));
+    } finally {
+      setReprocessingId(null);
+    }
+  };
+
+  const handleReprocessBatch = async () => {
+    if (errorIds.length === 0) return;
+    try {
+      let processed = 0;
+      const failures = new Set<string>();
+      for (let i = 0; i < errorIds.length; i += BATCH_CHUNK) {
+        const chunk = errorIds.slice(i, i + BATCH_CHUNK);
+        const res = await reprocessBatch({ ids: chunk }).unwrap();
+        processed += res.processed.length;
+        res.failed.forEach((f) => failures.add(reprocessReasonText(f.reason)));
+      }
+      if (failures.size > 0) {
+        toast.error(
+          `Restarted ${processed} stream${processed === 1 ? "" : "s"}. Skipped: ${[...failures].join(", ")}`,
+        );
+      } else {
+        toast.success(
+          `Restarted processing for ${processed} stream${processed === 1 ? "" : "s"}`,
+        );
+      }
+      clearSelection();
+    } catch {
+      toast.error("Failed to restart processing");
     }
   };
 
@@ -420,6 +488,12 @@ export const OwnStreamsPage = () => {
                 · {stuckIds.length} stuck processing
               </>
             )}
+            {errorIds.length > 0 && (
+              <>
+                {" "}
+                · {errorIds.length} failed
+              </>
+            )}
           </span>
           <button
             type="button"
@@ -452,6 +526,22 @@ export const OwnStreamsPage = () => {
             )}
             Mark As Failed
             {stuckIds.length > 0 && ` (${stuckIds.length})`}
+          </button>
+          <button
+            type="button"
+            disabled={errorIds.length === 0 || isReprocessBatchLoading}
+            onClick={handleReprocessBatch}
+            className={cn(
+              "inline-flex items-center gap-2 bg-accent text-accent-foreground hover:bg-accent/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold disabled:opacity-50 disabled:pointer-events-none",
+            )}
+          >
+            {isReprocessBatchLoading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <RefreshCw className="size-4" />
+            )}
+            Reprocess
+            {errorIds.length > 0 && ` (${errorIds.length})`}
           </button>
           <button
             type="button"
@@ -677,19 +767,37 @@ export const OwnStreamsPage = () => {
                     )}
                   </TableCell>
 
-                  {/* MP4 export / download. Only a transcoded stream has an
-                      HLS rendition to remux. */}
+                  {/* Row actions. A failed stream goes back to the workers,
+                      a transcoded one gets an MP4 export; the two are mutually
+                      exclusive, so they share one cell. */}
                   <TableCell
-                    className="hidden lg:table-cell"
+                    className="hidden sm:table-cell"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    {(stream.status === "ready" ||
-                      stream.status === "published") && (
-                      <ExportDownloadButton
-                        streamId={stream.id}
-                        iconOnly
-                        className="scale-90"
-                      />
+                    {stream.status === "error" ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleReprocess(stream.id)}
+                        disabled={reprocessingId === stream.id}
+                        aria-label="Reprocess"
+                        title="Send this stream back to the workers"
+                        className="inline-flex items-center justify-center w-9 shrink-0 cursor-pointer bg-accent text-accent-foreground hover:bg-accent/90 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 font-bold disabled:opacity-50 disabled:pointer-events-none"
+                      >
+                        {reprocessingId === stream.id ? (
+                          <Loader2 className="size-5 animate-spin" />
+                        ) : (
+                          <Reload className="size-5" />
+                        )}
+                      </button>
+                    ) : (
+                      (stream.status === "ready" ||
+                        stream.status === "published") && (
+                        <ExportDownloadButton
+                          streamId={stream.id}
+                          iconOnly
+                          className="scale-90"
+                        />
+                      )
                     )}
                   </TableCell>
                 </TableRow>

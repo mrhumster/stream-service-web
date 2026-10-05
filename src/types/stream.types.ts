@@ -118,6 +118,15 @@ export interface ForceErrorBatchResponse {
   failed: FacesBatchFailure[];
 }
 
+export interface ReprocessBatchRequest {
+  ids: string[];
+}
+
+export interface ReprocessBatchResponse {
+  processed: string[];
+  failed: FacesBatchFailure[];
+}
+
 export interface StartUploadRequest {
   file_name: string;
   total_size: number;

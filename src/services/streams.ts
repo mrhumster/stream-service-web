@@ -23,6 +23,8 @@ import type {
   FacesBatchRequest,
   ForceErrorBatchResponse,
   ForceErrorBatchRequest,
+  ReprocessBatchResponse,
+  ReprocessBatchRequest,
   StreamExportResponse,
   RequestStreamExportResponse,
 } from "../types/stream.types";
@@ -289,6 +291,23 @@ export const streamApi = createApi({
         { type: "Stream" as const, id: "LIST" },
       ],
     }),
+    reprocessStreamBatch: builder.mutation<
+      ReprocessBatchResponse,
+      ReprocessBatchRequest
+    >({
+      query: (body) => ({
+        url: "stream/reprocess/batch",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (res) => [
+        { type: "Stream" as const, id: "LIST" },
+        ...(res?.processed ?? []).map((id) => ({
+          type: "Stream" as const,
+          id,
+        })),
+      ],
+    }),
     forceStreamErrorBatch: builder.mutation<
       ForceErrorBatchResponse,
       ForceErrorBatchRequest
@@ -372,6 +391,7 @@ export const {
   usePublishStreamMutation,
   useUnpublishStreamMutation,
   useReprocessStreamMutation,
+  useReprocessStreamBatchMutation,
   useForceStreamErrorMutation,
   useForceStreamErrorBatchMutation,
   useProcessFacesStreamMutation,
