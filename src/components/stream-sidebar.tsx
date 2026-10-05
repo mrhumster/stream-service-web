@@ -78,16 +78,17 @@ export function StreamSidebar({ excludeId }: StreamSidebarProps) {
     offset,
   })
 
-  const filteredItems =
-    data?.items.filter((s) => s.id !== excludeId) ?? []
+  const items = data?.items ?? [];
+  const filteredItems = items.filter((s) => s.id !== excludeId);
+  const itemCount = items.length;
 
-  const hasMore = data ? data.items.length < data.total : true
+  const hasMore = data ? itemCount < data.total : true;
 
   const loadMore = useCallback(() => {
     if (!isFetching && hasMore && data) {
-      setOffset(data.items.length)
+      setOffset(itemCount)
     }
-  }, [isFetching, hasMore, data])
+  }, [isFetching, hasMore, data, itemCount])
 
   useEffect(() => {
     const sentinel = sentinelRef.current

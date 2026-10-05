@@ -298,13 +298,14 @@ export const OwnStreamsPage = () => {
     }
   };
 
-  const hasMore = data ? data.items.length < data.total : false;
+  const itemCount = streams.length;
+  const hasMore = data ? itemCount < data.total : false;
 
   const loadMore = useCallback(() => {
     if (!isFetching && hasMore && data) {
-      setOffset(data.items.length);
+      setOffset(itemCount);
     }
-  }, [isFetching, hasMore, data]);
+  }, [isFetching, hasMore, data, itemCount]);
 
   useEffect(() => {
     const sentinel = sentinelRef.current;
@@ -472,7 +473,7 @@ export const OwnStreamsPage = () => {
       </div>
 
       {/* Batch toolbar */}
-      {selectedIds.size > 0 && data && data.items.length > 0 && (
+      {selectedIds.size > 0 && data && streams.length > 0 && (
         <div className="mb-6 flex flex-wrap items-center gap-3 border-4 border-foreground/20 bg-card p-3 shadow-[4px_4px_0_0_rgba(0,0,0,0.3)]">
           <span className="text-xs uppercase font-bold text-muted-foreground">
             {selectedIds.size} selected
@@ -600,7 +601,7 @@ export const OwnStreamsPage = () => {
       )}
 
       {/* Empty */}
-      {data && data.items.length === 0 && (
+      {data && streams.length === 0 && (
         <div className="flex flex-col items-center gap-4 py-12">
           <p className="text-center text-muted-foreground text-sm uppercase font-bold">
             {isFiltering
@@ -620,9 +621,9 @@ export const OwnStreamsPage = () => {
       )}
 
       {/* Grid view */}
-      {data && data.items.length > 0 && viewMode === "grid" && (
+      {data && streams.length > 0 && viewMode === "grid" && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {data.items.map((stream) => (
+          {streams.map((stream) => (
             <StreamCard
               key={stream.id}
               stream={stream}
@@ -635,7 +636,7 @@ export const OwnStreamsPage = () => {
       )}
 
       {/* Table view */}
-      {data && data.items.length > 0 && viewMode === "table" && (
+      {data && streams.length > 0 && viewMode === "table" && (
         <Table>
           <TableHeader>
             <TableRow>
@@ -691,7 +692,7 @@ export const OwnStreamsPage = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.items.map((stream) => {
+            {streams.map((stream) => {
               const status = statusConfig[stream.status] ?? defaultStatus;
               return (
                 <TableRow
@@ -815,7 +816,7 @@ export const OwnStreamsPage = () => {
       {/* Sentinel for IntersectionObserver */}
       <div ref={sentinelRef} className="h-1" />
 
-      {isFetching && !isLoading && data && data.items.length > 0 && (
+      {isFetching && !isLoading && data && streams.length > 0 && (
         <div className="flex justify-center py-6">
           <Loader2 className="size-6 animate-spin text-muted-foreground" />
         </div>

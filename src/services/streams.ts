@@ -62,6 +62,29 @@ const baseQueryWithReauth: BaseQueryFn<
   return result;
 };
 
+// A list payload always carries an array, but guard anyway: mapping over a
+// null `items` throws inside the RTK Query reducer that computes provided
+// tags, which silently discards the fulfilled update and leaves the query
+// pending forever (endless spinner, previous page still on screen).
+const listTags = (items: StreamListResponse["items"] | null | undefined) => [
+  ...(items ?? []).map(({ id }: StreamResponse) => ({
+    type: "Stream" as const,
+    id,
+  })),
+  { type: "Stream" as const, id: "LIST" },
+];
+
+const appendPage = (
+  currentCache: StreamListResponse | undefined,
+  newItems: StreamListResponse,
+): StreamListResponse => {
+  if (newItems.offset === 0) return newItems;
+  return {
+    ...newItems,
+    items: [...(currentCache?.items ?? []), ...(newItems.items ?? [])],
+  };
+};
+
 export const streamApi = createApi({
   reducerPath: "streamApi",
   baseQuery: baseQueryWithReauth,
@@ -106,25 +129,10 @@ export const streamApi = createApi({
           queryArgs ?? {};
         return `${endpointName}:${JSON.stringify({ limit, status, faces_detected, sort, order })}`;
       },
-      merge: (currentCache, newItems) => {
-        if (newItems.offset === 0) return newItems;
-        return {
-          ...newItems,
-          items: [...currentCache.items, ...newItems.items],
-        };
-      },
+      merge: (currentCache, newItems) => appendPage(currentCache, newItems),
       forceRefetch: ({ currentArg, previousArg }) =>
         currentArg?.offset !== previousArg?.offset,
-      providesTags: (result) =>
-        result
-          ? [
-              ...result.items.map(({ id }: { id: string }) => ({
-                type: "Stream" as const,
-                id,
-              })),
-              { type: "Stream" as const, id: "LIST" },
-            ]
-          : [{ type: "Stream" as const, id: "LIST" }],
+      providesTags: (result) => listTags(result?.items),
     }),
     listStreamsPublic: builder.query<StreamListResponse, StreamListParams>({
       query: (params) => {
@@ -138,26 +146,10 @@ export const streamApi = createApi({
         const { limit, q } = queryArgs ?? {};
         return `${endpointName}:${JSON.stringify({ limit, q })}`;
       },
-      merge: (currentCache, newItems) => {
-        if (newItems.offset === 0) return newItems;
-        return {
-          ...newItems,
-          items: [...currentCache.items, ...newItems.items],
-        };
-      },
+      merge: (currentCache, newItems) => appendPage(currentCache, newItems),
       forceRefetch: ({ currentArg, previousArg }) =>
         currentArg?.offset !== previousArg?.offset,
-      providesTags: (result) =>
-        result
-          ? [
-              ...result.items.map(({ id }: { id: string }) => ({
-                type: "Stream" as const,
-                id,
-              })),
-
-              { type: "Stream" as const, id: "LIST" },
-            ]
-          : [{ type: "Stream" as const, id: "LIST" }],
+      providesTags: (result) => listTags(result?.items),
     }),
     listStreamsSidebar: builder.query<StreamListResponse, StreamListParams>({
       query: (params) => {
@@ -167,25 +159,10 @@ export const streamApi = createApi({
         return `stream?${searchParams.toString()}`;
       },
       serializeQueryArgs: ({ endpointName }) => endpointName,
-      merge: (currentCache, newItems) => {
-        if (newItems.offset === 0) return newItems;
-        return {
-          ...newItems,
-          items: [...currentCache.items, ...newItems.items],
-        };
-      },
+      merge: (currentCache, newItems) => appendPage(currentCache, newItems),
       forceRefetch: ({ currentArg, previousArg }) =>
         currentArg?.offset !== previousArg?.offset,
-      providesTags: (result) =>
-        result
-          ? [
-              ...result.items.map(({ id }: { id: string }) => ({
-                type: "Stream" as const,
-                id,
-              })),
-              { type: "Stream" as const, id: "LIST" },
-            ]
-          : [{ type: "Stream" as const, id: "LIST" }],
+      providesTags: (result) => listTags(result?.items),
     }),
     getStream: builder.query<StreamResponse, string>({
       query: (id) => `stream/${id}`,

@@ -28,25 +28,26 @@ export const StreamsPage = () => {
     q: debouncedQ,
   })
 
+  const items = data?.items ?? [];
   const filteredItems = activeTag
-    ? data?.items.filter((s) => s.tags?.some((t) => t === activeTag)) ?? []
-    : data?.items ?? []
+    ? items.filter((s) => s.tags?.some((t) => t === activeTag))
+    : items;
 
   const hasMore = data
     ? activeTag
       ? filteredItems.length < data.total
-      : data.items.length < data.total
-    : true
+      : items.length < data.total
+    : true;
 
   const loadMore = useCallback(() => {
     if (!isFetching && hasMore && data) {
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev)
-        next.set("offset", String(data.items.length))
+        next.set("offset", String(items.length))
         return next
       })
     }
-  }, [isFetching, hasMore, data, setSearchParams])
+  }, [isFetching, hasMore, data, items.length, setSearchParams])
 
   const applyQuery = useCallback(
     (value: string) => {
@@ -125,7 +126,7 @@ export const StreamsPage = () => {
         </p>
       )}
 
-      {data && data.items.length === 0 && !isLoading && (
+      {data && items.length === 0 && !isLoading && (
         q.trim() ? (
           <div className="text-center py-12">
             <p className="text-muted-foreground text-sm uppercase font-bold">
@@ -168,7 +169,7 @@ export const StreamsPage = () => {
         </div>
       )}
 
-      {activeTag && !isLoading && filteredItems.length === 0 && data && data.items.length > 0 && (
+      {activeTag && !isLoading && filteredItems.length === 0 && data && items.length > 0 && (
         <p className="text-center text-muted-foreground text-sm uppercase font-bold py-12">
           No streams with tag #{activeTag}
         </p>
