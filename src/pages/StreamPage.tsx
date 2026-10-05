@@ -265,7 +265,7 @@ export const StreamPage = () => {
                               {task.error}
                             </p>
                           ) : (
-                            task.steps.length > 0 && (
+                            (task.steps?.length ?? 0) > 0 && (
                               <p className="text-[10px] uppercase tracking-wider text-zinc-500">
                                 {task.steps.join(" → ")}
                               </p>
