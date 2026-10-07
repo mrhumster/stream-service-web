@@ -140,11 +140,15 @@ export const streamApi = createApi({
         searchParams.set("limit", String(params.limit ?? 10));
         searchParams.set("offset", String(params.offset ?? 0));
         if (params.q) searchParams.set("q", params.q);
+        if (params.sort && params.sort !== "created_at")
+          searchParams.set("sort", params.sort);
+        if (params.order && params.order !== "desc")
+          searchParams.set("order", params.order);
         return `stream?${searchParams.toString()}`;
       },
       serializeQueryArgs: ({ endpointName, queryArgs }) => {
-        const { limit, q } = queryArgs ?? {};
-        return `${endpointName}:${JSON.stringify({ limit, q })}`;
+        const { limit, q, sort, order } = queryArgs ?? {};
+        return `${endpointName}:${JSON.stringify({ limit, q, sort, order })}`;
       },
       merge: (currentCache, newItems) => appendPage(currentCache, newItems),
       forceRefetch: ({ currentArg, previousArg }) =>

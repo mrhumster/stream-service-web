@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom"
 import { StreamCard } from "@/components/stream-card"
 import { useAuth } from "@/hooks/useAuth"
 import { useListStreamsPublicQuery } from "@/services/streams"
-import { Plus, Loader2, X, Search } from "lucide-react"
+import { Plus, Loader2, X, Search, CalendarClock, ChevronDown } from "lucide-react"
 
 const PAGE_SIZE = 24
 
@@ -12,6 +12,7 @@ export const StreamsPage = () => {
   const [searchParams, setSearchParams] = useSearchParams()
   const activeTag = searchParams.get("tag") ?? ""
   const q = searchParams.get("q") ?? ""
+  const sort = searchParams.get("sort") ?? ""
   const offset = Number(searchParams.get("offset") ?? "0")
   const sentinelRef = useRef<HTMLDivElement>(null)
 
@@ -26,7 +27,22 @@ export const StreamsPage = () => {
     limit: PAGE_SIZE,
     offset,
     q: debouncedQ,
+    sort: sort === "recorded_at" ? "recorded_at" : undefined,
+    order: sort === "recorded_at" ? "desc" : undefined,
   })
+
+  const applySort = useCallback(
+    (value: string) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        if (value === "recorded_at") next.set("sort", value)
+        else next.delete("sort")
+        next.delete("offset")
+        return next
+      })
+    },
+    [setSearchParams],
+  )
 
   const items = data?.items ?? [];
   const filteredItems = activeTag
@@ -94,24 +110,40 @@ export const StreamsPage = () => {
         )}
       </div>
 
-      <div className="relative mb-6 max-w-md">
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <input
-          type="text"
-          value={q}
-          onChange={(e) => applyQuery(e.target.value)}
-          placeholder="Search streams by title or description..."
-          className="w-full h-10 bg-card border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] pl-9 pr-9 text-sm outline-none rounded-none focus:border-primary placeholder:text-muted-foreground"
-        />
-        {q && (
-          <button
-            onClick={() => applyQuery("")}
-            aria-label="Clear search"
-            className="absolute right-1 top-1/2 -translate-y-1/2 inline-flex items-center justify-center size-8 text-muted-foreground hover:text-foreground cursor-pointer"
+      <div className="flex items-start gap-4 mb-6">
+        <div className="relative flex-1 max-w-md">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            value={q}
+            onChange={(e) => applyQuery(e.target.value)}
+            placeholder="Search streams by title or description..."
+            className="w-full h-10 bg-card border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] pl-9 pr-9 text-sm outline-none rounded-none focus:border-primary placeholder:text-muted-foreground"
+          />
+          {q && (
+            <button
+              onClick={() => applyQuery("")}
+              aria-label="Clear search"
+              className="absolute right-1 top-1/2 -translate-y-1/2 inline-flex items-center justify-center size-8 text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              <X className="size-4" />
+            </button>
+          )}
+        </div>
+
+        <div className="relative inline-flex items-center ml-auto">
+          <CalendarClock className="pointer-events-none absolute left-3 z-10 size-4 text-muted-foreground" />
+          <select
+            value={sort === "recorded_at" ? "recorded_at" : "created_at"}
+            onChange={(e) => applySort(e.target.value)}
+            aria-label="Sort streams"
+            className="h-10 pl-9 pr-8 bg-card border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] text-sm outline-none rounded-none focus:border-primary cursor-pointer appearance-none [&>option]:bg-card"
           >
-            <X className="size-4" />
-          </button>
-        )}
+            <option value="created_at">Recently uploaded</option>
+            <option value="recorded_at">Recording date</option>
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-3 z-10 size-4 text-muted-foreground" />
+        </div>
       </div>
 
       {isLoading && (

@@ -71,7 +71,7 @@ export interface StreamResponse {
   faces_detected?: boolean;
 }
 
-export type StreamSortBy = "created_at" | "title" | "status";
+export type StreamSortBy = "created_at" | "title" | "status" | "recorded_at";
 export type StreamSortOrder = "asc" | "desc";
 
 export type StreamStatusFilter = StreamStatus | "all";
