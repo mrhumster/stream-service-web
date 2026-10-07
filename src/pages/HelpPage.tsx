@@ -55,7 +55,7 @@ const sections: Section[] = [
       {
         label: "Supported formats",
         description:
-          "mp4, webm, mov, avi and mkv files are accepted. Larger files are uploaded in chunks and resume from where they left off.",
+          "mp4, webm, mov, avi, mkv, 3gp and 3g2 files are accepted. Larger files are uploaded in chunks and resume from where they left off.",
       },
       {
         label: "Batch upload",

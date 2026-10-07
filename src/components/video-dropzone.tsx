@@ -25,7 +25,11 @@ export function VideoDropzone({
   disabled = false,
 }: VideoDropzoneProps) {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    accept: { "video/*": [] },
+    accept: {
+      "video/*": [],
+      "video/3gpp": [".3gp"],
+      "video/3gpp2": [".3g2"],
+    },
     maxFiles: multiple ? 20 : 1,
     disabled,
     onDrop: (accepted) => {
