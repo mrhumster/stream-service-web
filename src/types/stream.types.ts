@@ -95,6 +95,26 @@ export interface StreamListResponse {
   offset: number;
 }
 
+/**
+ * One set of same-name, same-duration/size streams. `keep` is the newest usable
+ * member; `deletable` are the older non-published members the owner may remove;
+ * `protected` are older published ones that are never deleted automatically.
+ */
+export interface DuplicateGroup {
+  title: string;
+  count: number;
+  keep: StreamResponse;
+  deletable: StreamResponse[];
+  protected: StreamResponse[];
+}
+
+export interface DuplicatesResponse {
+  groups: DuplicateGroup[];
+  total_groups: number;
+  total_deletable: number;
+  total_protected: number;
+}
+
 export interface FacesBatchRequest {
   ids: string[];
 }

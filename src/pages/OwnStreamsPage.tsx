@@ -19,7 +19,7 @@ import {
   thumbnailUrl,
 } from "@/lib/stream-format";
 import { cn, getErrorMessage } from "@/lib/utils";
-import { Plus, Loader2, LayoutGrid, List, ChevronUp, ChevronDown, Image, Filter, User, Siren, RefreshCw } from "lucide-react";
+import { Plus, Loader2, LayoutGrid, List, ChevronUp, ChevronDown, Image, Filter, User, Siren, RefreshCw, CopyX } from "lucide-react";
 import { Reload } from "pixelarticons/react";
 import {
   Table,
@@ -55,6 +55,7 @@ import type {
 } from "@/types/stream.types";
 import { ShareButton } from "@/components/stream/share-button";
 import { ExportDownloadButton } from "@/components/stream/export-download-button";
+import { DuplicatesDialog } from "@/components/stream/duplicates-dialog";
 import { useAppDispatch, useAppSelector } from "@/hooks";
 import {
   selectOwnStreamsFilters,
@@ -162,6 +163,7 @@ export const OwnStreamsPage = () => {
     useReprocessStreamBatchMutation();
   const [reprocessStream] = useReprocessStreamMutation();
   const [confirmForceError, setConfirmForceError] = useState(false);
+  const [duplicatesOpen, setDuplicatesOpen] = useState(false);
   // A mutation hook has a single isLoading for the whole page, so the row that
   // was clicked is tracked by id instead.
   const [reprocessingId, setReprocessingId] = useState<string | null>(null);
@@ -459,6 +461,17 @@ export const OwnStreamsPage = () => {
               <LayoutGrid className="size-4" />
             </button>
           </div>
+
+          {isAuth && (
+            <button
+              type="button"
+              onClick={() => setDuplicatesOpen(true)}
+              className="inline-flex items-center gap-2 bg-card text-card-foreground hover:bg-accent border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 rounded-none uppercase text-xs h-9 px-4 font-bold"
+            >
+              <CopyX className="size-4" />
+              Find duplicates
+            </button>
+          )}
 
           {isAuth && (
             <Link
@@ -821,6 +834,8 @@ export const OwnStreamsPage = () => {
           <Loader2 className="size-6 animate-spin text-muted-foreground" />
         </div>
       )}
+
+      <DuplicatesDialog open={duplicatesOpen} onOpenChange={setDuplicatesOpen} />
     </div>
   );
 };

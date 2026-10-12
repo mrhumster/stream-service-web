@@ -7,27 +7,28 @@ import {
 } from "@reduxjs/toolkit/query/react";
 import { type RootState } from "../store/store";
 import { eraseAuth, tokenReceived } from "../feature/auth/authSlice";
-import type { LoginResponse } from "../types/auth.types";
 import type {
-  CreateStreamRequest,
-  UpdateStreamRequest,
   StreamListParams,
   StreamListResponse,
   StreamResponse,
+  CreateStreamRequest,
+  UpdateStreamRequest,
+  FacesBatchRequest,
+  FacesBatchResponse,
+  ForceErrorBatchRequest,
+  ForceErrorBatchResponse,
+  ReprocessBatchRequest,
+  ReprocessBatchResponse,
+  DuplicatesResponse,
   StartUploadRequest,
   StartUploadResponse,
   UploadPartRequest,
   UploadPartResponse,
   CompleteUploadRequest,
-  FacesBatchResponse,
-  FacesBatchRequest,
-  ForceErrorBatchResponse,
-  ForceErrorBatchRequest,
-  ReprocessBatchResponse,
-  ReprocessBatchRequest,
   StreamExportResponse,
   RequestStreamExportResponse,
 } from "../types/stream.types";
+import { type LoginResponse } from "../types/auth.types";
 
 const baseQuery = fetchBaseQuery({
   baseUrl: import.meta.env.VITE_API_URL as string,
@@ -214,7 +215,12 @@ export const streamApi = createApi({
       invalidatesTags: (_res, _err, id) => [
         { type: "Stream" as const, id },
         { type: "Stream" as const, id: "LIST" },
+        { type: "Stream" as const, id: "DUPLICATES" },
       ],
+    }),
+    getDuplicateStreams: builder.query<DuplicatesResponse, void>({
+      query: () => "stream/own/duplicates",
+      providesTags: [{ type: "Stream" as const, id: "DUPLICATES" }],
     }),
     initUpload: builder.mutation<
       StartUploadResponse,
@@ -369,6 +375,7 @@ export const {
   usePartUploadMutation,
   useCompleteUploadMutation,
   useListOwnStreamsQuery,
+  useGetDuplicateStreamsQuery,
   usePublishStreamMutation,
   useUnpublishStreamMutation,
   useReprocessStreamMutation,
