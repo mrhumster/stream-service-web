@@ -10,6 +10,7 @@ import {
   CardFooter,
 } from "@/components/ui/card"
 import { MarqueeTitle } from "@/components/marquee-title"
+import { StreamThumbnail } from "@/components/stream/stream-thumbnail"
 import { cn } from "@/lib/utils"
 import {
   defaultStatus,
@@ -61,9 +62,10 @@ export function StreamCard({
         )}
         {showThumbnail ? (
           <>
-            <img
+            <StreamThumbnail
               src={thumbnailUrl(stream.id)}
               alt={stream.title}
+              rotation={stream.metadata?.rotation}
               loading="lazy"
               className="w-full h-full object-cover aspect-square"
               onError={() => setThumbnailError(true)}

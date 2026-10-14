@@ -82,9 +82,12 @@ export const PeopleBlock = ({ streamId }: { streamId: string }) => {
 
   return (
     <div className="border-4 border-foreground/20 bg-card shadow-[4px_4px_0_0_rgba(0,0,0,0.3)] p-4 mb-6 rounded-none">
-      <h3 className="text-xs uppercase font-bold tracking-tight mb-3">
+      <h3 className="text-xs uppercase font-bold tracking-tight mb-1">
         People in this video
       </h3>
+      <p className="text-[9px] uppercase tracking-wider text-muted-foreground mb-3">
+        Wrong detection? Remove a person who isn&apos;t in this video.
+      </p>
       <ul className="flex flex-col gap-2">
         {data.clusters.map(({ cluster, count }) => (
           <li
@@ -97,6 +100,7 @@ export const PeopleBlock = ({ streamId }: { streamId: string }) => {
             >
               <FaceCrop
                 clusterId={cluster.id}
+                version={cluster.updated_at}
                 hasCrop={Boolean(cluster.crop_object)}
               />
               <span className="flex-1 min-w-0">
@@ -123,11 +127,12 @@ export const PeopleBlock = ({ streamId }: { streamId: string }) => {
               type="button"
               onClick={() => setPending({ cluster, count })}
               disabled={detaching}
-              title="Remove from this video"
+              title="Remove this person from this video"
               aria-label="Remove from this video"
-              className="flex shrink-0 items-center justify-center px-3 text-muted-foreground hover:text-destructive disabled:opacity-40 transition-colors"
+              className="inline-flex h-9 shrink-0 self-center mr-2 items-center gap-1.5 border-2 border-black bg-card text-card-foreground hover:bg-destructive hover:text-destructive-foreground px-2.5 text-[10px] font-bold uppercase tracking-wider shadow-[2px_2px_0_0_rgba(0,0,0,0.8)] active:shadow-none active:translate-x-[1px] active:translate-y-[1px] rounded-none disabled:opacity-40 transition-colors"
             >
-              <UnlinkIcon className="size-4" />
+              <UnlinkIcon className="size-3.5" />
+              Remove
             </button>
           </li>
         ))}

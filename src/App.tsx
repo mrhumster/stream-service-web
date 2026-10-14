@@ -9,6 +9,7 @@ import { VerifyPage } from "./pages/VerifyPage";
 import { ActivityPage } from "./pages/ActivityPage";
 import { PeoplePage } from "./pages/PeoplePage";
 import { PeopleDetailPage } from "./pages/PeopleDetailPage";
+import { PeopleSearchPage } from "./pages/PeopleSearchPage";
 import { ProtectedRoute } from "./components/protected-route";
 import { ThemeProvider } from "@/components/theme-provider";
 import { OwnStreamsPage } from "./pages/OwnStreamsPage";
@@ -33,6 +34,7 @@ const router = createBrowserRouter([
           { path: "/streams/:id/edit", element: <EditStreamPage /> },
           { path: "/activity", element: <ActivityPage /> },
           { path: "/people", element: <PeoplePage /> },
+          { path: "/people/search", element: <PeopleSearchPage /> },
           { path: "/people/:clusterId", element: <PeopleDetailPage /> },
         ],
       },

@@ -2,6 +2,7 @@ import { useRef, useEffect, useCallback, useState } from "react"
 import { Link } from "react-router-dom"
 import { Image, Loader2 } from "lucide-react"
 import { useListStreamsSidebarQuery } from "@/services/streams"
+import { StreamThumbnail } from "@/components/stream/stream-thumbnail"
 import {
   formatDuration,
   hasThumbnail,
@@ -36,9 +37,11 @@ function SidebarCard({ stream }: { stream: StreamResponse }) {
       <div className="relative aspect-video bg-muted overflow-hidden">
         {showThumbnail ? (
           <>
-            <img
+            <StreamThumbnail
               src={thumbnailUrl(stream.id)}
               alt={stream.title}
+              rotation={stream.metadata?.rotation}
+              containerAspect={16 / 9}
               loading="lazy"
               className="w-full h-full object-cover transition-transform group-hover:scale-105"
               onError={() => setThumbnailError(true)}

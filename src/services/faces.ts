@@ -14,10 +14,13 @@ import type {
   FaceDetailResponse,
   FaceCluster,
   FaceCropReplaceResponse,
+  FaceCropFromSampleRequest,
   StreamFacesResponse,
   RenameFaceRequest,
   MergeFacesRequest,
   MergeFacesResponse,
+  MergeDuplicatesRequest,
+  MergeDuplicatesResponse,
   DeleteFaceResponse,
   DeleteEmptyFacesResponse,
   DetachStreamFaceResponse,
@@ -27,6 +30,8 @@ import type {
   BatchDeleteFacesResponse,
   DetectFrameResponse,
   AttachFrameFaceResponse,
+  FacesVideoSearchRequest,
+  FacesVideoSearchResponse,
 } from "../types/face.types.ts";
 
 const baseQuery = fetchBaseQuery({
@@ -130,11 +135,13 @@ export const facesApi = createApi({
         const searchParams = new URLSearchParams();
         searchParams.set("limit", String(params.limit ?? 50));
         searchParams.set("offset", String(params.offset ?? 0));
+        if (params.sort) searchParams.set("sort", params.sort);
+        if (params.order) searchParams.set("order", params.order);
         return `faces?${searchParams.toString()}`;
       },
       serializeQueryArgs: ({ endpointName, queryArgs }) => {
-        const { limit } = queryArgs ?? {};
-        return `${endpointName}:${JSON.stringify({ limit })}`;
+        const { limit, sort, order } = queryArgs ?? {};
+        return `${endpointName}:${JSON.stringify({ limit, sort, order })}`;
       },
       merge: (currentCache, newItems) => {
         if (newItems.offset === 0) return newItems;
@@ -147,7 +154,9 @@ export const facesApi = createApi({
         return { ...newItems, clusters };
       },
       forceRefetch: ({ currentArg, previousArg }) =>
-        currentArg?.offset !== previousArg?.offset,
+        currentArg?.offset !== previousArg?.offset ||
+        currentArg?.sort !== previousArg?.sort ||
+        currentArg?.order !== previousArg?.order,
       providesTags: () => [{ type: "Faces" as const, id: "LIST" }],
     }),
     getFaceSuggestions: builder.query<
@@ -163,6 +172,15 @@ export const facesApi = createApi({
     getFace: builder.query<FaceDetailResponse, string>({
       query: (clusterId) => `faces/${clusterId}`,
       providesTags: (_res, _err, id) => [{ type: "Faces" as const, id }],
+    }),
+    /* Which of the owner's videos contain the selected persons. A mutation, not
+     * a query: the result is an ephemeral snapshot of a user-driven search and
+     * must re-run whenever the selection or mode changes. */
+    searchVideosByFaces: builder.mutation<
+      FacesVideoSearchResponse,
+      FacesVideoSearchRequest
+    >({
+      query: (body) => ({ url: "faces/videos", method: "POST", body }),
     }),
     renameFace: builder.mutation<FaceCluster, { id: string; body: RenameFaceRequest }>({
       query: ({ id, body }) => ({
@@ -182,12 +200,23 @@ export const facesApi = createApi({
         { type: "Faces" as const, id: "LIST" },
       ],
     }),
-    getFaceCrop: builder.query<Blob, string>({
-      query: (clusterId) => ({
-        url: `faces/${clusterId}/crop`,
+    /* ``version`` bakes the cluster's ``updated_at`` into the URL. The crop is
+     * served from a stable URL with ``Cache-Control: max-age=3600`` and no
+     * validators, so after a replace the browser would keep serving the old
+     * JPEG for up to an hour. Changing the URL on every cluster update busts
+     * that cache while leaving unchanged crops to be served from it. */
+    getFaceCrop: builder.query<
+      Blob,
+      { id: string; version?: string | number }
+    >({
+      query: ({ id, version }) => ({
+        url:
+          version === undefined
+            ? `faces/${id}/crop`
+            : `faces/${id}/crop?v=${encodeURIComponent(version)}`,
         responseHandler: (response) => response.blob(),
       }),
-      providesTags: (_res, _err, id) => [{ type: "Faces" as const, id }],
+      providesTags: (_res, _err, { id }) => [{ type: "Faces" as const, id }],
     }),
     replaceFaceCrop: builder.mutation<
       FaceCropReplaceResponse,
@@ -206,6 +235,66 @@ export const facesApi = createApi({
         { type: "Faces" as const, id },
         { type: "Faces" as const, id: "LIST" },
       ],
+      async onQueryStarted({ id }, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          // Update the detail view's cluster immediately so the crop URL's
+          // ?v= (updated_at) changes without waiting for the invalidation refetch.
+          dispatch(
+            facesApi.util.updateQueryData("getFace", id, (draft) => {
+              draft.cluster = data.cluster;
+            }),
+          );
+        } catch {
+          // nothing to roll back
+        }
+      },
+    }),
+    /* Rebuilt on the fly from the sampled frame the occurrence was detected on;
+     * the URL contains "/crop" so it goes through the crop concurrency cap.
+     * Not tagged: a sample crop is immutable, so replacing the cluster crop
+     * must not invalidate (and re-infer) every thumbnail. */
+    getSampleCrop: builder.query<
+      Blob,
+      { id: string; streamId: string; tSeconds: number }
+    >({
+      query: ({ id, streamId, tSeconds }) => ({
+        url: `faces/${id}/samples/${streamId}/crop?t_seconds=${tSeconds}`,
+        responseHandler: (response) => response.blob(),
+      }),
+    }),
+    replaceCropFromSample: builder.mutation<
+      FaceCropReplaceResponse,
+      { id: string; streamId: string; tSeconds: number }
+    >({
+      query: ({ id, streamId, tSeconds }) => {
+        const body: FaceCropFromSampleRequest = {
+          stream_id: streamId,
+          t_seconds: tSeconds,
+        };
+        return {
+          url: `faces/${id}/crop/from-sample`,
+          method: "PUT",
+          body,
+        };
+      },
+      invalidatesTags: (_res, _err, { id }) => [
+        { type: "Faces" as const, id },
+        { type: "Faces" as const, id: "LIST" },
+      ],
+      async onQueryStarted({ id }, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(
+            facesApi.util.updateQueryData("getFace", id, (draft) => {
+              draft.cluster = data.cluster;
+            }),
+          );
+          dispatch(streamApi.util.invalidateTags(["Stream"]));
+        } catch {
+          // nothing to roll back
+        }
+      },
     }),
     deleteFace: builder.mutation<DeleteFaceResponse, string>({
       query: (clusterId) => ({
@@ -235,6 +324,25 @@ export const facesApi = createApi({
         { type: "Faces" as const, id: "LIST" },
         ...cluster_ids.map((id) => ({ type: "Faces" as const, id })),
       ],
+      async onQueryStarted(_args, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          dispatch(streamApi.util.invalidateTags(["Stream"]));
+        } catch {
+          // nothing to roll back
+        }
+      },
+    }),
+    mergeDuplicates: builder.mutation<
+      MergeDuplicatesResponse,
+      MergeDuplicatesRequest | void
+    >({
+      query: (body) => ({
+        url: "faces/merge-duplicates",
+        method: "POST",
+        body: body ?? {},
+      }),
+      invalidatesTags: () => [{ type: "Faces" as const, id: "LIST" }],
       async onQueryStarted(_args, { dispatch, queryFulfilled }) {
         try {
           await queryFulfilled;
@@ -348,13 +456,17 @@ export const facesApi = createApi({
 export const {
   useListFacesQuery,
   useGetFaceQuery,
+  useSearchVideosByFacesMutation,
   useGetFaceSuggestionsQuery,
   useRenameFaceMutation,
   useListStreamFacesQuery,
   useGetFaceCropQuery,
   useReplaceFaceCropMutation,
+  useGetSampleCropQuery,
+  useReplaceCropFromSampleMutation,
   useDeleteFaceMutation,
   useMergeFacesMutation,
+  useMergeDuplicatesMutation,
   useDeleteEmptyFacesMutation,
   useDetachFaceFromStreamMutation,
   useDeleteFacesBatchMutation,

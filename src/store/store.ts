@@ -2,6 +2,7 @@ import { combineReducers, configureStore } from "@reduxjs/toolkit";
 import { authSlice } from "../feature/auth/authSlice";
 import { settingsReducer } from "../feature/settings/settingsSlice";
 import { ownStreamsFiltersReducer } from "../feature/ownStreams/ownStreamsFiltersSlice";
+import { peopleViewReducer } from "../feature/people/peopleViewSlice";
 import { authApi } from "../services/auth";
 import { userApi } from "../services/users";
 import { streamApi } from "../services/streams";
@@ -23,6 +24,7 @@ const rootReducer = combineReducers({
   auth: authSlice.reducer,
   settings: settingsReducer,
   ownStreamsFilters: ownStreamsFiltersReducer,
+  peopleView: peopleViewReducer,
 });
 
 export const store = configureStore({

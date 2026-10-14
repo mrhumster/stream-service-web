@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import {
   Loader2,
@@ -26,10 +26,12 @@ import {
   useGetFaceSuggestionsQuery,
   useRenameFaceMutation,
   useReplaceFaceCropMutation,
+  useReplaceCropFromSampleMutation,
   useDeleteFaceMutation,
   useMergeFacesMutation,
 } from "@/services/faces";
 import { FaceCrop } from "@/components/faces/face-crop";
+import { SampleCrop } from "@/components/faces/sample-crop";
 import { cn } from "@/lib/utils";
 import { thumbnailUrl } from "@/lib/stream-format";
 
@@ -113,6 +115,8 @@ export const PeopleDetailPage = () => {
   });
   const [renameFace, { isLoading: renaming }] = useRenameFaceMutation();
   const [replaceCrop, { isLoading: replacing }] = useReplaceFaceCropMutation();
+  const [replaceFromSample, { isLoading: applyingSample }] =
+    useReplaceCropFromSampleMutation();
   const [deleteFace, { isLoading: deleting }] = useDeleteFaceMutation();
   const [mergeFaces, { isLoading: merging }] = useMergeFacesMutation();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -120,8 +124,29 @@ export const PeopleDetailPage = () => {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState<string>("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [pickOpen, setPickOpen] = useState(false);
+  const [pickTab, setPickTab] = useState<"samples" | "upload">("samples");
 
   const cluster = data?.cluster;
+
+  /* One sample per video (highest confidence), most confident first, capped so
+   * opening the picker never fans out into hundreds of inference requests. */
+  const sampleOccurrences = useMemo(() => {
+    const best = new Map<string, { stream_id: string; t_seconds: number; confidence: number }>();
+    for (const o of data?.occurrences ?? []) {
+      const cur = best.get(o.stream_id);
+      if (!cur || o.confidence > cur.confidence) {
+        best.set(o.stream_id, {
+          stream_id: o.stream_id,
+          t_seconds: o.t_seconds,
+          confidence: o.confidence,
+        });
+      }
+    }
+    return [...best.values()]
+      .sort((a, b) => b.confidence - a.confidence)
+      .slice(0, 24);
+  }, [data?.occurrences]);
 
   const rawPrefix =
     editing && name.trim().length >= 3 && cluster ? name.trim() : "";
@@ -149,12 +174,30 @@ export const PeopleDetailPage = () => {
     try {
       await replaceCrop({ id: cluster.id, file }).unwrap();
       toast.success("Picture updated");
+      setPickOpen(false);
     } catch (err) {
       const detail = (err as { data?: { detail?: string } } | undefined)?.data
         ?.detail;
       toast.error(detail ? `Failed: ${detail}` : "Failed to update picture");
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const onPickSample = async (streamId: string, tSeconds: number) => {
+    if (!cluster) return;
+    try {
+      await replaceFromSample({
+        id: cluster.id,
+        streamId,
+        tSeconds,
+      }).unwrap();
+      toast.success("Picture updated");
+      setPickOpen(false);
+    } catch (err) {
+      const detail = (err as { data?: { detail?: string } } | undefined)?.data
+        ?.detail;
+      toast.error(detail ? `Failed: ${detail}` : "Failed to update picture");
     }
   };
 
@@ -223,6 +266,7 @@ export const PeopleDetailPage = () => {
         <div className="mb-6 flex flex-wrap items-center gap-3">
           <FaceCrop
             clusterId={cluster.id}
+            version={cluster.updated_at}
             hasCrop={Boolean(cluster.crop_object)}
             lazy={false}
             className="size-16 border-4 border-foreground/30"
@@ -233,13 +277,13 @@ export const PeopleDetailPage = () => {
           </h2>
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={replacing}
+            onClick={() => setPickOpen(true)}
+            disabled={replacing || applyingSample}
             aria-label="Replace picture"
             className="inline-flex items-center gap-2 border-2 border-black bg-card text-card-foreground hover:bg-accent px-3 py-1.5 text-[10px] uppercase font-bold shadow-[2px_2px_0_0_rgba(0,0,0,0.8)] active:shadow-none active:translate-x-[1px] active:translate-y-[1px] rounded-none disabled:opacity-50"
           >
             <Upload className="size-3.5" />
-            {replacing ? "Uploading..." : "Replace picture"}
+            Replace picture
           </button>
           <button
             type="button"
@@ -415,6 +459,88 @@ export const PeopleDetailPage = () => {
           </div>
         </details>
       )}
+
+      <Dialog
+        open={pickOpen}
+        onOpenChange={(open) => !open && setPickOpen(false)}
+      >
+        <DialogContent className="border-4 border-primary shadow-[8px_8px_0_0_rgba(0,0,0,1)] rounded-none max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-sm uppercase tracking-wider">
+              Replace picture
+            </DialogTitle>
+            <DialogDescription className="text-xs uppercase tracking-wider">
+              Pick one of this person's samples, or upload an image.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex gap-2">
+            {(["samples", "upload"] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setPickTab(tab)}
+                className={cn(
+                  "flex-1 border-2 border-black px-3 py-1.5 text-[10px] uppercase font-bold rounded-none transition-colors",
+                  pickTab === tab
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-card text-card-foreground hover:bg-accent",
+                )}
+              >
+                {tab === "samples" ? "From samples" : "Upload"}
+              </button>
+            ))}
+          </div>
+
+          {pickTab === "samples" && cluster && (
+            sampleOccurrences.length > 0 ? (
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-[55vh] overflow-y-auto pr-1">
+                {sampleOccurrences.map((o) => (
+                  <SampleCrop
+                    key={`${o.stream_id}:${o.t_seconds}`}
+                    clusterId={cluster.id}
+                    streamId={o.stream_id}
+                    tSeconds={o.t_seconds}
+                    onSelect={() => void onPickSample(o.stream_id, o.t_seconds)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="text-center text-muted-foreground text-xs uppercase font-bold py-10">
+                No samples available
+              </p>
+            )
+          )}
+
+          {pickTab === "upload" && (
+            <div className="flex flex-col items-center gap-3 py-8">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={replacing}
+                className="inline-flex items-center gap-2 border-2 border-black bg-card text-card-foreground hover:bg-accent px-4 py-2 text-[10px] uppercase font-bold shadow-[2px_2px_0_0_rgba(0,0,0,0.8)] active:shadow-none active:translate-x-[1px] active:translate-y-[1px] rounded-none disabled:opacity-50"
+              >
+                <Upload className="size-3.5" />
+                {replacing ? "Uploading…" : "Choose image…"}
+              </button>
+              <p className="text-[10px] uppercase text-muted-foreground">
+                JPEG, PNG or WebP · up to 5 MB
+              </p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <button
+              type="button"
+              className={pixelBtnOutline}
+              disabled={applyingSample}
+              onClick={() => setPickOpen(false)}
+            >
+              Cancel
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={confirmDelete}

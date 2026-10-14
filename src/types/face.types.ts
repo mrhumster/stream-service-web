@@ -40,9 +40,19 @@ export interface SimilarityGroup<T extends FaceCluster = FaceCluster> {
   maxSim: number;
 }
 
+export type FacesViewMode = "people" | "similar";
+
+export type FacesLayout = "list" | "grid";
+
+export type FaceSortField = "name" | "samples" | "added";
+
+export type FaceSortOrder = "asc" | "desc";
+
 export interface FaceListParams {
   limit?: number;
   offset?: number;
+  sort?: FaceSortField;
+  order?: FaceSortOrder;
 }
 
 export interface FaceNameSuggestion {
@@ -93,6 +103,28 @@ export interface FaceDetailResponse {
   videos: FaceClusterVideo[];
 }
 
+/* Person -> videos search: which videos the selected clusters appear in. */
+export type FacesVideoMatchMode = "all" | "any";
+
+export interface FacesVideoMatch {
+  stream_id: string;
+  /** distinct selected clusters present in the video */
+  persons: number;
+  /** raw occurrence count in the video */
+  frames: number;
+}
+
+export interface FacesVideoSearchRequest {
+  cluster_ids: string[];
+  mode: FacesVideoMatchMode;
+}
+
+export interface FacesVideoSearchResponse {
+  streams: FacesVideoMatch[];
+  total: number;
+  mode: FacesVideoMatchMode;
+}
+
 export interface StreamFacesCluster {
   cluster: FaceCluster;
   count: number;
@@ -117,6 +149,17 @@ export interface MergeFacesResponse {
   target_id: string;
 }
 
+export interface MergeDuplicatesRequest {
+  /** similarity floor; omitted uses the server default (0.995) */
+  min_similarity?: number;
+}
+
+export interface MergeDuplicatesResponse {
+  groups_merged: number;
+  clusters_merged: number;
+  failures: number;
+}
+
 export interface DeleteFaceResponse {
   cluster_id: string;
 }
@@ -124,6 +167,11 @@ export interface DeleteFaceResponse {
 export interface FaceCropReplaceResponse {
   cluster: FaceCluster;
   crop_object: string;
+}
+
+export interface FaceCropFromSampleRequest {
+  stream_id: string;
+  t_seconds: number;
 }
 
 /* Interactive frame assist: the owner pauses the player, the paused frame is

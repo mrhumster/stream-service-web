@@ -6,9 +6,30 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Link } from "react-router-dom";
-import { Loader2, Sparkles, Copy, Delete, Merge, SquareCheckBig, Users as UsersIcon } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  Loader2,
+  Sparkles,
+  Copy,
+  Delete,
+  Merge,
+  SquareCheckBig,
+  Users as UsersIcon,
+  ChevronDown,
+  ArrowDownUp,
+  LayoutGrid,
+  List,
+  Film,
+} from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { useAppDispatch, useAppSelector } from "@/hooks";
+import {
+  selectPeopleView,
+  setMode,
+  setLayout,
+  setSortField,
+} from "@/feature/people/peopleViewSlice";
 import {
   Dialog,
   DialogContent,
@@ -21,21 +42,38 @@ import {
   useListFacesQuery,
   useDeleteFaceMutation,
   useMergeFacesMutation,
+  useMergeDuplicatesMutation,
   useDeleteEmptyFacesMutation,
   useDeleteFacesBatchMutation,
 } from "@/services/faces";
 import { FaceCrop } from "@/components/faces/face-crop";
-import { formatPercent, SIMILARITY_THRESHOLD } from "@/lib/face-similarity";
+import {
+  formatPercent,
+  SIMILARITY_THRESHOLD,
+  EXACT_DUPLICATE_SIMILARITY,
+} from "@/lib/face-similarity";
 import type {
   FaceCluster,
   FaceClusterWithStats,
   FacesListResponse,
+  FaceSortField,
+  FaceSortOrder,
+  FacesLayout,
+  FacesViewMode,
   SimilarityGroup,
 } from "@/types/face.types";
 
 const PAGE_SIZE = 50;
 const BATCH_DELETE_CHUNK_SIZE = 100;
 const BATCH_MERGE_CHUNK_SIZE = 100;
+
+// Direction each sort field uses; the server pins named clusters on top and
+// only reorders within the named/unnamed sections.
+const FACE_SORT_ORDER: Record<FaceSortField, FaceSortOrder> = {
+  name: "asc",
+  samples: "desc",
+  added: "desc",
+};
 
 // The first merge request carries a full chunk; every later one also carries the
 // already-merged target cluster, so it only fits BATCH_MERGE_CHUNK_SIZE - 1 ids.
@@ -67,6 +105,7 @@ function formatTime(iso: string) {
 
 function collapseDuplicates(
   clusters: FacesListResponse["clusters"],
+  sortField: FaceSortField,
 ): { cluster: FacesListResponse["clusters"][number]; similar: number }[] {
   const byName = new Map<string, FacesListResponse["clusters"]>();
   const singles: FacesListResponse["clusters"] = [];
@@ -94,6 +133,12 @@ function collapseDuplicates(
   return out.sort((a, b) => {
     const namedCmp = Number(b.cluster.is_named) - Number(a.cluster.is_named);
     if (namedCmp !== 0) return namedCmp;
+    if (sortField === "samples") {
+      return b.cluster.sample_count - a.cluster.sample_count;
+    }
+    if (sortField === "added") {
+      return b.cluster.created_at.localeCompare(a.cluster.created_at);
+    }
     const nameA = a.cluster.name ?? "";
     const nameB = b.cluster.name ?? "";
     const nameCmp = nameA.localeCompare(nameB);
@@ -141,7 +186,11 @@ function PersonRow({
         to={`/people/${c.id}`}
         className="flex-1 min-w-0 flex items-center gap-3"
       >
-        <FaceCrop clusterId={c.id} hasCrop={Boolean(c.crop_object)} />
+        <FaceCrop
+          clusterId={c.id}
+          version={c.updated_at}
+          hasCrop={Boolean(c.crop_object)}
+        />
         <span className="flex-1 min-w-0">
           <span className="block text-[11px] uppercase font-bold tracking-tight truncate">
             {c.is_named ? c.name : `Person ${formatShortId(c.id)}`}
@@ -178,6 +227,78 @@ function PersonRow({
           <Delete className="size-4" />
         </button>
       )}
+    </li>
+  );
+}
+
+interface PersonTileProps {
+  person: Person;
+  selectionMode: boolean;
+  selected: boolean;
+  onToggle: (id: string) => void;
+  similar?: number;
+  onDelete?: (person: Person) => void;
+}
+
+function PersonTile({
+  person: c,
+  selectionMode,
+  selected,
+  onToggle,
+  similar,
+  onDelete,
+}: PersonTileProps) {
+  return (
+    <li className="relative border-4 bg-card text-foreground hover:bg-accent border-foreground/20 shadow-[4px_4px_0_0_rgba(0,0,0,1)] rounded-none overflow-hidden transition-colors">
+      {selectionMode && (
+        <label className="absolute top-2 left-2 z-10 inline-flex items-center cursor-pointer bg-background/80 p-1 border-2 border-black">
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={() => onToggle(c.id)}
+            className="size-4 accent-[#ffcc00]"
+          />
+        </label>
+      )}
+      {!selectionMode && onDelete && (
+        <button
+          type="button"
+          onClick={() => onDelete(c)}
+          aria-label="Delete person"
+          className="absolute top-2 right-2 z-10 inline-flex items-center justify-center size-8 border-2 border-black bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-[2px_2px_0_0_rgba(0,0,0,0.8)] active:shadow-none active:translate-x-[1px] active:translate-y-[1px] rounded-none"
+        >
+          <Delete className="size-4" />
+        </button>
+      )}
+      <Link to={`/people/${c.id}`} className="block">
+        <div className="relative aspect-square border-b-2 border-foreground/10 bg-background">
+          <FaceCrop
+            clusterId={c.id}
+            version={c.updated_at}
+            hasCrop={Boolean(c.crop_object)}
+            className="size-full"
+            iconClassName="size-8"
+          />
+          {similar !== undefined && similar > 0 && (
+            <span className="absolute bottom-2 left-2 z-10 inline-flex items-center gap-1 bg-black/80 text-white px-1.5 py-0.5 text-[9px] uppercase font-bold">
+              <Copy className="size-3" />
+              {similar} similar
+            </span>
+          )}
+        </div>
+        <div className="px-3 py-2">
+          <span className="block text-[11px] uppercase font-bold tracking-tight truncate">
+            {c.is_named ? c.name : `Person ${formatShortId(c.id)}`}
+          </span>
+          <span className="block text-[10px] uppercase text-muted-foreground mt-0.5">
+            {c.sample_count} sample{c.sample_count === 1 ? "" : "s"} ·{" "}
+            {c.video_count} video{c.video_count === 1 ? "" : "s"}
+          </span>
+          <span className="block text-[9px] uppercase text-muted-foreground/70 mt-0.5">
+            {formatTime(c.created_at)}
+          </span>
+        </div>
+      </Link>
     </li>
   );
 }
@@ -239,15 +360,22 @@ function SimilarGroupCard({
 }
 
 export const PeoplePage = () => {
+  const dispatch = useAppDispatch();
+  const navigate = useNavigate();
+  const { mode, layout, sortField } = useAppSelector(selectPeopleView);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [offset, setOffset] = useState(0);
 
   const { data, isLoading, isFetching, error } = useListFacesQuery({
     limit: PAGE_SIZE,
     offset,
+    sort: sortField,
+    order: FACE_SORT_ORDER[sortField],
   });
   const [deleteFace, { isLoading: deleting }] = useDeleteFaceMutation();
   const [mergeFaces, { isLoading: merging }] = useMergeFacesMutation();
+  const [mergeDuplicates, { isLoading: mergingDuplicates }] =
+    useMergeDuplicatesMutation();
   const [deleteEmptyFaces, { isLoading: deletingEmpty }] =
     useDeleteEmptyFacesMutation();
   const [deleteFacesBatch, { isLoading: deletingBatch }] =
@@ -257,6 +385,7 @@ export const PeoplePage = () => {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleteTarget, setDeleteTarget] = useState<Person | null>(null);
   const [confirmMerge, setConfirmMerge] = useState(false);
+  const [confirmMergeDuplicates, setConfirmMergeDuplicates] = useState(false);
   const [mergeProgress, setMergeProgress] = useState<{
     done: number;
     total: number;
@@ -268,6 +397,20 @@ export const PeoplePage = () => {
 
   const groups = useMemo(() => data?.groups ?? [], [data]);
 
+  const exactGroups = useMemo(
+    () =>
+      groups.filter(
+        (g) =>
+          g.members.length > 0 &&
+          g.members.every((m) => m.sim >= EXACT_DUPLICATE_SIMILARITY),
+      ),
+    [groups],
+  );
+  const exactClusterCount = useMemo(
+    () => exactGroups.reduce((n, g) => n + 1 + g.members.length, 0),
+    [exactGroups],
+  );
+
   const groupIds = useMemo(() => {
     const ids = new Set<string>();
     for (const g of groups) {
@@ -278,7 +421,7 @@ export const PeoplePage = () => {
   }, [groups]);
 
   const restClusters = useMemo(
-    () => (clusters ?? []).filter((c) => !groupIds.has(c.id)),
+    () => (clusters ?? []).filter((c) => !groupIds.has(c.id) || c.is_named),
     [clusters, groupIds],
   );
 
@@ -286,11 +429,14 @@ export const PeoplePage = () => {
     clusters && clusters.length > 0
       ? selectionMode
         ? restClusters.map((c) => ({ cluster: c, similar: 0 }))
-        : collapseDuplicates(restClusters)
+        : collapseDuplicates(restClusters, sortField)
       : [];
 
-  const shownCount =
-    rows.length + groups.reduce((sum, g) => sum + 1 + g.members.length, 0);
+  const groupMemberCount = groups.reduce(
+    (sum, g) => sum + 1 + g.members.length,
+    0,
+  );
+  const shownCount = mode === "people" ? rows.length : groupMemberCount;
 
   const hasMore = data ? data.clusters.length < data.rest_total : false;
 
@@ -300,7 +446,27 @@ export const PeoplePage = () => {
     }
   }, [isFetching, hasMore, data]);
 
+  const switchMode = (next: FacesViewMode) => {
+    if (next === mode) return;
+    dispatch(setMode(next));
+    setOffset(0);
+    setSelected(new Set());
+    setSelectionMode(false);
+  };
+
+  const changeSort = (next: FaceSortField) => {
+    if (next === sortField) return;
+    dispatch(setSortField(next));
+    setOffset(0);
+  };
+
+  const changeLayout = (next: FacesLayout) => {
+    if (next === layout) return;
+    dispatch(setLayout(next));
+  };
+
   useEffect(() => {
+    if (mode !== "people") return;
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
 
@@ -313,7 +479,7 @@ export const PeoplePage = () => {
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [loadMore]);
+  }, [loadMore, mode]);
 
   const deleteTargets: Person[] = useMemo(() => {
     if (!deleteTarget) return [];
@@ -446,6 +612,30 @@ export const PeoplePage = () => {
     }
   };
 
+  const runMergeDuplicates = async () => {
+    try {
+      const res = await mergeDuplicates().unwrap();
+      if (res.groups_merged === 0) {
+        toast.success("No exact duplicates to merge");
+      } else {
+        toast.success(
+          `Merged ${res.groups_merged} duplicate ${
+            res.groups_merged === 1 ? "group" : "groups"
+          }${res.failures ? `, ${res.failures} failed` : ""}`,
+        );
+      }
+      setConfirmMergeDuplicates(false);
+      setSelected(new Set());
+      setOffset(0);
+    } catch (err) {
+      const detail = (err as { data?: { detail?: string } } | undefined)?.data
+        ?.detail;
+      toast.error(
+        detail ? `Failed: ${detail}` : "Failed to merge duplicates",
+      );
+    }
+  };
+
   const runDeleteEmpty = async () => {
     try {
       const res = await deleteEmptyFaces().unwrap();
@@ -492,13 +682,52 @@ export const PeoplePage = () => {
     setOffset(0);
   };
 
+  const findVideos = () => {
+    if (sortedSelected.length === 0) return;
+    const persons = selectedPeople.map((c) => ({
+      id: c.id,
+      name: c.is_named ? c.name : null,
+    }));
+    navigate(`/people/search?persons=${sortedSelected.join(",")}`, {
+      state: { persons },
+    });
+  };
+
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h2 className="text-2xl font-bold uppercase tracking-tighter select-none cursor-default">
           People
         </h2>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex border-4 border-foreground/20">
+            <button
+              type="button"
+              onClick={() => switchMode("people")}
+              className={cn(
+                "inline-flex items-center gap-1.5 px-3 py-1.5 uppercase text-xs font-bold transition-colors",
+                mode === "people"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80",
+              )}
+            >
+              <UsersIcon className="size-3.5" />
+              People
+            </button>
+            <button
+              type="button"
+              onClick={() => switchMode("similar")}
+              className={cn(
+                "inline-flex items-center gap-1.5 px-3 py-1.5 uppercase text-xs font-bold transition-colors",
+                mode === "similar"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80",
+              )}
+            >
+              <Sparkles className="size-3.5" />
+              Similar{groups.length > 0 ? ` ${groups.length}` : ""}
+            </button>
+          </div>
           {data?.total !== undefined && (
             <span className="text-[10px] uppercase font-bold text-muted-foreground">
               {data.total} cluster{data.total === 1 ? "" : "s"} · {shownCount}{" "}
@@ -508,7 +737,64 @@ export const PeoplePage = () => {
         </div>
       </div>
 
-      {data && data.empty_count > 0 && (
+      {mode === "people" && (
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">
+            {data?.rest_total ?? 0} people sorted by{" "}
+            {sortField === "name"
+              ? "name"
+              : sortField === "samples"
+                ? "samples"
+                : "date added"}
+          </span>
+          <div className="flex items-center gap-2">
+            <div className="flex border-4 border-foreground/20">
+              <button
+                type="button"
+                onClick={() => changeLayout("list")}
+                aria-label="List view"
+                className={cn(
+                  "inline-flex items-center justify-center size-9 transition-colors",
+                  layout === "list"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80",
+                )}
+              >
+                <List className="size-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => changeLayout("grid")}
+                aria-label="Grid view"
+                className={cn(
+                  "inline-flex items-center justify-center size-9 transition-colors",
+                  layout === "grid"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80",
+                )}
+              >
+                <LayoutGrid className="size-4" />
+              </button>
+            </div>
+            <div className="relative">
+              <ArrowDownUp className="size-4 absolute left-3 top-1/2 -translate-y-1/2 z-10 pointer-events-none" />
+              <select
+                aria-label="Sort people"
+                value={sortField}
+                onChange={(e) => changeSort(e.target.value as FaceSortField)}
+                className="h-9 pl-9 pr-9 bg-card text-card-foreground border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] rounded-none uppercase text-xs font-bold appearance-none cursor-pointer"
+              >
+                <option value="name">Name (A–Z)</option>
+                <option value="samples">Samples (most)</option>
+                <option value="added">Added (newest)</option>
+              </select>
+              <ChevronDown className="size-4 absolute right-3 top-1/2 -translate-y-1/2 z-10 pointer-events-none" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mode === "people" && data && data.empty_count > 0 && (
         <div className="flex flex-wrap items-center gap-3 mb-4 border-2 border-dashed border-muted-foreground/50 bg-card px-4 py-3 rounded-none">
           <span className="text-[10px] uppercase font-bold text-muted-foreground">
             {data.empty_count} empty person{" "}
@@ -535,6 +821,16 @@ export const PeoplePage = () => {
             <span className="text-[10px] uppercase font-bold text-muted-foreground flex-1 min-w-[160px]">
               {sortedSelected.length} selected
             </span>
+            <button
+              type="button"
+              disabled={sortedSelected.length < 1}
+              onClick={findVideos}
+              aria-label="Find videos with selected people"
+              className={pixelBtn}
+            >
+              <Film className="size-3.5" />
+              Find videos
+            </button>
             <button
               type="button"
               disabled={sortedSelected.length < 2 || merging}
@@ -604,35 +900,23 @@ export const PeoplePage = () => {
         </p>
       )}
 
-      {data && data.clusters.length === 0 && groups.length === 0 && (
-        <p className="text-center text-muted-foreground text-sm uppercase font-bold py-12">
-          No faces detected yet
-        </p>
+      {mode === "people" && rows.length > 0 && layout === "grid" && (
+        <ul className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
+          {rows.map(({ cluster: c, similar }) => (
+            <PersonTile
+              key={c.id}
+              person={c}
+              selectionMode={selectionMode}
+              selected={selected.has(c.id)}
+              onToggle={toggle}
+              similar={similar}
+              onDelete={setDeleteTarget}
+            />
+          ))}
+        </ul>
       )}
 
-      {groups.length > 0 && (
-        <div className="mb-6">
-          <h3 className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-2">
-            Similar faces (similarity ≥ {formatPercent(SIMILARITY_THRESHOLD)}) —
-            likely duplicates
-          </h3>
-          <ul className="flex flex-col gap-3">
-            {groups.map((g) => (
-              <SimilarGroupCard
-                key={g.rep.id}
-                group={g}
-                selectionMode={selectionMode}
-                selected={selected}
-                onToggle={toggle}
-                onDelete={setDeleteTarget}
-                onSelectAll={selectGroupAll}
-              />
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {rows.length > 0 && (
+      {mode === "people" && rows.length > 0 && layout === "list" && (
         <ul className="flex flex-col gap-2">
           {rows.map(({ cluster: c, similar }) => (
             <PersonRow
@@ -646,6 +930,62 @@ export const PeoplePage = () => {
             />
           ))}
         </ul>
+      )}
+
+      {mode === "people" && rows.length === 0 && data && (
+        <p className="text-center text-muted-foreground text-sm uppercase font-bold py-12">
+          {data.total === 0
+            ? "No faces detected yet"
+            : data.rest_total === 0
+              ? "Everyone here is in a similarity group — check the Similar tab"
+              : "No people on this page"}
+        </p>
+      )}
+
+      {mode === "similar" && (
+        <div className="mb-6">
+          {groups.length > 0 ? (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <h3 className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">
+                  Similar faces (similarity ≥{" "}
+                  {formatPercent(SIMILARITY_THRESHOLD)}) — likely duplicates
+                </h3>
+                {exactGroups.length > 0 && (
+                  <button
+                    type="button"
+                    disabled={mergingDuplicates}
+                    onClick={() => setConfirmMergeDuplicates(true)}
+                    aria-label="Merge exact duplicate people"
+                    className={pixelBtn}
+                  >
+                    <Merge className="size-3.5" />
+                    {mergingDuplicates
+                      ? "Merging..."
+                      : `Merge ${exactGroups.length} exact`}
+                  </button>
+                )}
+              </div>
+              <ul className="flex flex-col gap-3">
+                {groups.map((g) => (
+                  <SimilarGroupCard
+                    key={g.rep.id}
+                    group={g}
+                    selectionMode={selectionMode}
+                    selected={selected}
+                    onToggle={toggle}
+                    onDelete={setDeleteTarget}
+                    onSelectAll={selectGroupAll}
+                  />
+                ))}
+              </ul>
+            </>
+          ) : (
+            <p className="text-center text-muted-foreground text-sm uppercase font-bold py-12">
+              No similar faces detected
+            </p>
+          )}
+        </div>
       )}
 
       <Dialog
@@ -727,6 +1067,43 @@ export const PeoplePage = () => {
       </Dialog>
 
       <Dialog
+        open={confirmMergeDuplicates}
+        onOpenChange={setConfirmMergeDuplicates}
+      >
+        <DialogContent className="border-4 border-primary shadow-[4px_4px_0_0_rgba(0,0,0,1)] rounded-none max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-sm uppercase tracking-wider">
+              Merge {exactGroups.length} exact{" "}
+              {exactGroups.length === 1 ? "duplicate" : "duplicates"}?
+            </DialogTitle>
+            <DialogDescription className="text-xs uppercase tracking-wider">
+              Every member is at least {formatPercent(EXACT_DUPLICATE_SIMILARITY)}{" "}
+              identical, so there is nothing to decide — these are the same
+              person. {exactClusterCount} clusters collapse into{" "}
+              {exactGroups.length}. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              type="button"
+              className={pixelBtnOutline}
+              onClick={() => setConfirmMergeDuplicates(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className={pixelBtn}
+              disabled={mergingDuplicates}
+              onClick={() => void runMergeDuplicates()}
+            >
+              {mergingDuplicates ? "Merging..." : "Merge"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
         open={confirmDeleteBatch}
         onOpenChange={setConfirmDeleteBatch}
       >
@@ -797,13 +1174,17 @@ This will remove {deleteBatchSamples} sample
       </Dialog>
 
       {/* Sentinel for IntersectionObserver */}
-      <div ref={sentinelRef} className="h-1" />
+      {mode === "people" && <div ref={sentinelRef} className="h-1" />}
 
-      {isFetching && !isLoading && data && data.clusters.length > 0 && (
-        <div className="flex justify-center py-6">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
-        </div>
-      )}
+      {mode === "people" &&
+        isFetching &&
+        !isLoading &&
+        data &&
+        data.clusters.length > 0 && (
+          <div className="flex justify-center py-6">
+            <Loader2 className="size-6 animate-spin text-muted-foreground" />
+          </div>
+        )}
     </div>
   );
 };

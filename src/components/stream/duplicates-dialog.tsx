@@ -13,6 +13,7 @@ import {
   useDeleteStreamMutation,
   useGetDuplicateStreamsQuery,
 } from "@/services/streams";
+import { StreamThumbnail } from "@/components/stream/stream-thumbnail";
 import {
   defaultStatus,
   formatDate,
@@ -45,9 +46,10 @@ function StatusBadge({ status }: { status: StreamResponse["status"] }) {
 
 function thumb(stream: StreamResponse) {
   return hasThumbnail(stream.status) ? (
-    <img
+    <StreamThumbnail
       src={thumbnailUrl(stream.id)}
       alt=""
+      rotation={stream.metadata?.rotation}
       className="w-10 h-10 shrink-0 object-cover border-2 border-foreground/10"
       loading="lazy"
     />

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { StreamCard } from "@/components/stream-card";
+import { StreamThumbnail } from "@/components/stream/stream-thumbnail";
 import { useAuth } from "@/hooks/useAuth";
 import {
   useListOwnStreamsQuery,
@@ -96,9 +97,10 @@ function ThumbCell({ stream }: { stream: StreamResponse }) {
     );
   }
   return (
-    <img
+    <StreamThumbnail
       src={thumbnailUrl(stream.id)}
       alt=""
+      rotation={stream.metadata?.rotation}
       className="w-10 h-10 object-cover border-2 border-foreground/10"
       loading="lazy"
       onError={() => setBroken(true)}

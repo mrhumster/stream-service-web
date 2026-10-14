@@ -6,6 +6,12 @@ import { cn } from "@/lib/utils";
 
 interface FaceCropProps {
   clusterId: string;
+  /**
+   * Cache-buster for the crop URL. Pass the cluster's ``updated_at`` so a
+   * replaced crop is re-fetched instead of served from the browser's HTTP
+   * cache (the response has a long max-age and no validators).
+   */
+  version?: string | number;
   className?: string;
   iconClassName?: string;
   hasCrop?: boolean;
@@ -14,6 +20,7 @@ interface FaceCropProps {
 
 export const FaceCrop = ({
   clusterId,
+  version,
   className,
   iconClassName,
   hasCrop = true,
@@ -22,9 +29,12 @@ export const FaceCrop = ({
   const { ref, inView } = useInView<HTMLSpanElement>();
 
   const shouldFetch = hasCrop && (!lazy || inView);
-  const { data, isLoading, isError } = useGetFaceCropQuery(clusterId, {
-    skip: !shouldFetch,
-  });
+  const { data, isLoading, isError } = useGetFaceCropQuery(
+    { id: clusterId, version },
+    {
+      skip: !shouldFetch,
+    },
+  );
   const url = useMemo(
     () => (data ? URL.createObjectURL(data) : null),
     [data],
